@@ -1,0 +1,343 @@
+---
+title: "GRAD-C6-2001: Statistics II — Replication Paper"
+subtitle: "Revisiting the labor market competition hypothesis in a comparative perspective: Does retirement affect opinion about immigration?"
+author: "Ana Elisa Von Borstel da Silva (ana-borstel)"
+date: "`r format(Sys.time(), '%B %d, %Y | %H:%M:%S | %Z')`"
+output:
+  html_document:
+    code_folding: hide
+    df_print: paged
+    highlight: tango
+    theme: cosmo
+---
+  
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      eval = TRUE,
+                      error = FALSE,
+                      message = FALSE,
+                      warning = FALSE,
+                      fig.align = "center")
+```
+
+<!-- Do not forget to input the title of the paper, as well as your name and Github username in the YAML configuration up there --> 
+
+***
+
+```{r, include = F}
+# LOAD PACKAGES AND DATA
+set.seed(42) 
+
+library(dplyr) 
+library(tidyr) 
+library(ggplot2) 
+library(readr) 
+library(tidyverse)
+library(ggdag)
+library(dagitty)
+
+library(margins) 
+library(ggeffects)
+library(effects)
+library(haven)
+
+library(estimatr)
+library(texreg)
+
+df <- read_dta("data.dta")
+rep_df <- read_dta("ESS7e02_2.dta") ## Load the complete dataset
+```
+
+---
+## Fact sheet
+
+The article explores the drivers of public opinion about immigration, with focus on the influence of job market competition. The hypothesis is that being part of the job market affects peoples' attitudes towards immigration. It is argued that people who compete directly against immigrants in the job market are less favorable to immigration policies. The literature review shows that peoples' opinion about migration depends on several factors such as skills level, type of job, education, etc. Moreover, there are unobservable variables that can affect the attitude towards migration, such as believes, values, and cognitive abilities. To test the hypothesis that job market participation affects attitude towards immigration, the author analyses the relation of being retired and defensive attitude towards immigration. To address possible endogeneity, the author analyses the impact of retirement on labor market participation across 14 European countries through an instrumental variable, the countries' statuary retirement age. The author concludes that retirement does not change peoples' opinion on immigration. This is can be explained by the ideas of ego and socio tropic. Even when people get retired, they are still concerned about how policies affect the society (socio tropic) and not only about how affect themselves (ego tropic). 
+
+The data used for this analyses was provided by the European Social Survey. The data is from the round 7, year 2014, collected by face-to-face interviews in 14 countries in Europe and contains 40,185 observations and 37 variables. The data contains information not only about migration but about politics, media, religion, health, inequality, values and beliefs. The author utilized the section on migration and reorganized the data to include only man between 50 to 69. She also created new variables such as age (calculated based on the date of birth). Her final data comprises 3616 observations. 
+
+The empirical strategy used by the author was the instrumental variable and ordinary least square regression. As illustrated below, the instrumental variables (early and full retirement age) are related to the independent variable (retirement), but not to the outcome (attitude towards immigration). The instrumental variables can be used to control for endogeneity. There are several factors that can affect when someone gets retired; however, the countries' statuary age of retirement is a good predictor of when people will usually retire. The author uses two instrumental variables to account for differences in retirement age across countries. The author also uses control variables to isolate the effect of the independent variable on the dependent one. Controlling for confounders closes the other paths between the independent and dependent variables.    
+
+## DAG
+
+```{r}
+coord_dag <- list(
+  x = c(D = 0, I = -1 , U = 1, Y = 2, A = 0, B = 1, C = 2),
+  y = c(D = 0, I = 0, U = 1, Y = 0, A = -1, B = -1, C = -1)) # List indicating the position of variables regarding the x and y axis 
+
+our_dag <- ggdag::dagify(D ~ I + U + A + B + C,
+                         Y ~ D + U + A + B + C,
+                         coords = coord_dag,
+                         exposure = "D", # D is the independent variable
+                         outcome = "Y", # Y is the dependent variable
+                         latent = "U") %>% # U is the unobserved variable
+  ggdag::tidy_dagitty() %>% 
+  dplyr::mutate(colour = ifelse(name == "U", "Unobservable", ifelse(name == "A", "Control", ifelse(name == "B", "Control", ifelse(name == "C", "Control", "Observable")))))
+
+our_dag %>% # plot for the dag
+  ggplot(aes(
+    x = x,
+    y = y,
+    xend = xend,
+    yend = yend
+  )) +
+  ggdag::geom_dag_point(aes(colour = colour)) +
+  ggdag::geom_dag_edges() +
+  ggdag::geom_dag_text() +
+  ggdag::theme_dag() +
+  scale_color_manual(values = c("coral4", "deepskyblue4", "#a7a8aa")) +
+  theme(legend.title = element_blank())
+```
+
+- **Y** is the dependent variable: attitude towards immigration. In the dataset, it is represented by **imbgeco**, **imtcjob** and **imbleco**
+- **D** is the independent variable: retirement. In the dataset, it is represented by **rtrd**
+- **I** is the instrument variable: early and full retirement age. In the dataset, they are represented by **above_early** and **above_full**
+- **U** is the unobservable variable(s): believes, values, and cognitive abilities
+- **A**, **B** and **C** are control variables:  age, education, income, if have children, political orientation (left-right), if born abroad, if married, if live in a rural area, country, and qualification. In the dataset, they are represented by **agea**, **eduyrs**, **hinctnta**, **ever_child**, **lrscale**, **brncntr**, **married**, **rural**, **country**, **iscoco10**
+
+First, the author checks if the instrumental variable is directly related to the dependent variable or not. For the instrumental variable to be valid, the instrumental variable cannot directly affect the dependent variable. Therefore, the author checked if, when people get in the age of retirement, they change their attitude towards migration. By plotting the data, the author showed that there is no systematic discontinuity in attitude towards migration by the age of retirement. As can be seen in the figure below, there is no change in the mean of the dependent variables by the age of retirement.
+
+## Replication Figure 1 - Mean attitudes towards immigration, discontinuity around full retirement age by country
+
+```{r}
+data <- data.frame(df$agea, df$rtrd, df$above_early, df$above_full, df$full_retire_age, df$early_retire_age, df$age_lastwork, df$pensions_income, df$eduyrs, df$ever_child, df$lrscale, df$brncntr, df$rural, df$married, df$hinctnta, df$imbgeco, df$imtcjob, df$imbleco, df$cntry, df$iscoco10, df$country, df$agesquared) ## Keep only the variables used by the author to easier visualization
+
+data_fig1 <- na.omit(data) ## Omit NAs
+
+data_fig1 <- data_fig1 %>% ## Change the data to the long format
+  tidyr::pivot_longer(
+    cols = c(df.imbleco, df.imtcjob, df.imbgeco),
+    names_to = "dep_variables",
+    names_prefix = "-df.",
+    values_to = "score")
+
+data_fig1 <- data_fig1 %>% ## Change the abbreviation of the countries to the full name
+   dplyr::mutate(df.cntry = ifelse(df.cntry == "AT", "Austria", 
+                  ifelse(df.cntry == "BE", "Belgium", ifelse(df.cntry == "DK", "Denmark",                          
+                  ifelse(df.cntry == "FI", "Finland", ifelse(df.cntry == "FR", "France",                          
+                  ifelse(df.cntry == "DE", "Germany", ifelse(df.cntry == "IE", "Ireland",                          
+                  ifelse(df.cntry == "NL", "Netherlands", 
+                  ifelse(df.cntry == "PT", "Portugal", ifelse(df.cntry == "ES", "Spain", 
+                  ifelse(df.cntry == "SE", "Sweden", ifelse(df.cntry == "GB", "United Kingdom", 
+                  ifelse(df.cntry == "CH", "Switzerland", "Norway"))))))))))))))  %>%
+   dplyr::group_by(dep_variables, df.cntry, df.agea) %>%
+   dplyr::summarize(ave = mean(score)) %>%
+   dplyr::mutate (ret_age = case_when (df.cntry == "France" ~ 61.2, df.cntry == "Ireland" ~ 66, df.cntry == "Norway" ~ 67, TRUE ~ 65))
+
+data_fig1 %>% ## Plot the data
+  ggplot(.,aes(x = df.agea, y = ave, colour = dep_variables)) +
+  geom_line() + 
+  ylim(0,10) +
+  facet_wrap(~df.cntry) +
+  theme_minimal() +
+  geom_vline(aes(xintercept = ret_age), linetype = "solid", colour = "coral4") +
+  labs(title = "Mean attitudes towards immigration, discontinuity around full retirement age",
+       x = "Age of respondents, calculated",
+       y = "Mean",
+       color = "") +
+  scale_colour_manual(name = " ", 
+                     values = c("grey18", "#a7a8aa", "deepskyblue4"),
+                     labels = c("Immigration good for economy", "Immigrants put in more taxes", "Immigration creates jobs"))+ 
+  theme(legend.position="bottom")
+```
+
+On the *Y axis*, it is the mean of responses of the three questions that formed the dependent variables. In the *X axis* is the age of respondents, calculated by the author, since in the original database this information is not available. There is no systematic change in the mean of the responses by the age of retirement in any country of the sample.
+
+Additionally, for the **early and full retirement age** to be considered valid instrumental variables, they need to predict the propensity of people to retire. To prove that, the author used a table to show the retirement rates of the sample by country. The table shows the percentage of people retired in the sample, and the percentages of people retired above the early retirement age and above the full retirement age.
+
+## Replication Table 2 - Retirement rates of sample, by country
+
+```{r}
+data_tab2 <- data.frame(df$cntry, df$rtrd, df$above_early, df$above_full) ## Keep only the relevant variables
+
+data_tab2 <- na.omit(data_tab2) ## Omit NAs
+
+data_tab2 <- data_tab2 %>% ## Re-organize the data to change the abbreviation of countries to the full name
+  dplyr::mutate(df.cntry = ifelse(df.cntry == "AT", "Austria", 
+                  ifelse(df.cntry == "BE", "Belgium", ifelse(df.cntry == "DK", "Denmark",                          
+                  ifelse(df.cntry == "FI", "Finland", ifelse(df.cntry == "FR", "France",                          
+                  ifelse(df.cntry == "DE", "Germany", ifelse(df.cntry == "IE", "Ireland",                          
+                  ifelse(df.cntry == "NL", "Netherlands", 
+                  ifelse(df.cntry == "PT", "Portugal", ifelse(df.cntry == "ES", "Spain", 
+                  ifelse(df.cntry == "SE", "Sweden", ifelse(df.cntry == "GB", "United Kingdom", 
+                  ifelse(df.cntry == "CH", "Switzerland", "Norway")))))))))))))) %>%
+  group_by(df.cntry) %>% ## Calculate the percentage of retirement, early retirement and full retirement by country
+  summarize(per_retired = (sum(df.rtrd)/length(df.rtrd))*100, per_above_early =    (sum(df.above_early)/length(df.above_early))*100, per_above_full = (sum(df.above_full)/length(df.above_full))*100 ) %>% ## Tranform the data to the long format to use ggplot
+  tidyr::pivot_longer(
+    cols = c(per_retired,  per_above_early, per_above_full),
+    names_to = "retirement_state",
+    names_prefix = "-per_",
+    values_to = "percentage")
+
+data_tab2 %>% ggplot(., aes( x = df.cntry, y = percentage)) + ## Plot the data
+  geom_bar(aes(fill = factor(retirement_state)), stat="identity", width = 0.5, position = position_dodge(width = 1)) +
+  coord_flip() +
+  scale_fill_manual(name = " ", 
+                     values = c("coral4", "#a7a8aa", "deepskyblue4"),
+                     labels = c("Above early", "Above full", "Retired")) +
+  theme_minimal() +
+  labs(x = "Countries",
+       y = "Percentage of retired people")
+```
+
+The author then regresses the instrumental variables on the independent variable using the control variables. The first stage model shows that early and full retirement ages are statistically significant when predicting the retirement state of people in the sample. Being above the early retirement age increases, on average, 0.14 points the chance of being retired and being above the full retirement age increases, on average, 0.19 points.
+
+## Replication of table 3 - First stage model
+
+```{r}
+first_stage <- lm(df.rtrd ~ df.above_early + df.above_full + df.agea + df.agesquared + df.eduyrs + df.hinctnta + df.ever_child + df.lrscale + df.brncntr + factor(df.married) + factor(df.rural) + factor(df.iscoco10) + factor(df.country), data = data)
+
+texreg::screenreg(first_stage, custom.model.names = c("Ordinary least squares"), custom.coef.map = list("(Intercept)" = "Intercept", "df.above_early" = "Above early", "df.above_full" = "Above full", "df.agea" = "Age", "df.agesquared" = "Age-squared", "df.eduyrs" = "Education", "df.hinctnta" = "Income", "df.ever_child" = "Children", "df.lrscale" = "Left-right", "df.brncntr" = "Born abroad", "factor(df.married)1" = "Married", "factor(df.rural)1" = "Rural"), single.row = T, table = F) 
+```
+Finally, the author estimates the OLS and IV for the three dependent variables. The IV models show that, on average, **being retired**:
+
+- decreases the perception that immigration is beneficial to the **economy** by 0.60 points;
+- decreases the perception that immigration creates **jobs** by 0.35 points;
+- decreases the perception that immigrants contribute more taxes than services received by 0.35 points.
+
+## Replication Table 4 - Ordinary least squares Economy (OLS) and instrumental variable (IV) results
+```{r}
+data <- data.frame(df$agea, df$rtrd, df$above_early, df$above_full, df$full_retire_age, df$early_retire_age, df$age_lastwork, df$pensions_income, df$eduyrs, df$ever_child, df$lrscale, df$brncntr, df$rural, df$married, df$hinctnta, df$imbgeco, df$imtcjob, df$imbleco, df$cntry, df$iscoco10, df$country, df$agesquared)
+
+OLS_model1 <- lm(df.imbgeco ~ df.rtrd + df.agea + df.agesquared + df.eduyrs + df.hinctnta + df.ever_child + df.lrscale + df.brncntr + factor(df.married) + factor(df.rural) + factor(df.country) + factor(df.iscoco10), data = data)
+
+IV_model1 <- AER::ivreg(df.imbgeco ~ df.rtrd + df.agea + df.agesquared + df.eduyrs + df.hinctnta + df.ever_child + df.lrscale + df.brncntr + factor(df.married) + factor(df.rural) + factor(df.country) + factor(df.iscoco10) | df.agea + df.agesquared + df.eduyrs + df.hinctnta + df.ever_child + df.lrscale + df.brncntr + factor(df.married) + factor(df.rural) + factor(df.country) + factor(df.iscoco10) + df.above_early + df.above_full, data = data)
+
+OLS_model2 <- lm(df.imtcjob ~ df.rtrd + df.agea + df.agesquared + df.eduyrs + df.hinctnta + df.ever_child + df.lrscale + df.brncntr + factor(df.married) + factor(df.rural) + factor(df.country) + factor(df.iscoco10), data = data)
+
+IV_model2 <- AER::ivreg(df.imtcjob ~ df.rtrd + df.agea + df.agesquared + df.eduyrs + df.hinctnta + df.ever_child + df.lrscale + df.brncntr + factor(df.married) + factor(df.rural) + factor(df.country) + factor(df.iscoco10) | df.agea + df.agesquared + df.eduyrs + df.hinctnta + df.ever_child + df.lrscale + df.brncntr + factor(df.married) + factor(df.rural) + factor(df.country) + factor(df.iscoco10) + df.above_early + df.above_full, data = data)
+
+OLS_model3 <- lm(df.imbleco ~ df.rtrd + df.agea + df.agesquared + df.eduyrs + df.hinctnta + df.ever_child + df.lrscale + df.brncntr + factor(df.married) + factor(df.rural) + factor(df.country) + factor(df.iscoco10), data = data)
+
+IV_model3 <- AER::ivreg(df.imbleco ~ df.rtrd + df.agea + df.agesquared + df.eduyrs + df.hinctnta + df.ever_child + df.lrscale + df.brncntr + factor(df.married) + factor(df.rural) + factor(df.country) + factor(df.iscoco10) | df.agea + df.agesquared + df.eduyrs + df.hinctnta + df.ever_child + df.lrscale + df.brncntr + factor(df.married) + factor(df.rural) + factor(df.country) + factor(df.iscoco10) + df.above_early + df.above_full, data = data)
+
+texreg::screenreg(list(OLS_model1, IV_model1, OLS_model2, IV_model2, OLS_model3, IV_model3), 
+                label = "Model 1", custom.header = list ( "Economy" = 1:2, "Jobs" = 3:4, "Taxes and services" = 5:6), custom.model.names=c("OLS", "IV", "OLS", "IV", "OLS", "IV"), custom.coef.map = list("(Intercept)" = "Constant", "df.rtrd" = "Retired", "df.agea" = "Age", "df.agesquared" = "Age-squared", "df.eduyrs" = "Education", "df.hinctnta" = "Income", "df.ever_child" = "Children", "df.lrscale" = "Left-right", "df.brncntr" = "Born abroad", "factor(df.married)1" = "Married", "factor(df.rural)1" = "Rural"),table = FALSE)
+```
+These models are not statistically significant, meaning that **being retired** does not affect the **attitude towards immigration**. The author concludes that when people retire (leave the job market), they do not support immigration more; therefore, labor market competition alone is not a good explanation on the public opinion about immigration.
+
+The second part of the author's analysis explores the socio-tropic vs the ego-tropic motivations of individuals. The objective is to explore if individuals tend to think about immigration in terms of own personal interests (ego-tropic) or in terms of national interests (socio-tropic). Again, the data only includes men from 50 to 69 years old, but this time the author subset the data to include only **retired** men. The sample was divided into two groups:
+
+- for the first group, it is asked "To what extent do you think [country] should allow **professionals** from [poor country outside Europe] to come and live in [country]?" 
+- for the second group, it is asked: "To what extent do you think [coun- try] should allow **unskilled** laborers from [poor country outside Europe] to come and live in [country]?"
+
+The answers ranged from **allow many**, **allow some**, **allow few** to **allow none**. 
+
+## Replication Figure 2 - Support for immigration restrictions by treatment group amongst retired individuals
+```{r}
+data_fig2 <- data <- data.frame(df$treatment, df$entry_allow, df$rtrd) ## Keep only the variables interesting to our analysis 
+
+data_fig2 <- na.omit(data_fig2) ## Clean the data to generate the plot
+
+data_fig2 <- dplyr::filter(data_fig2, df.rtrd == 1) %>% ## Subset the data to only retired men
+         dplyr::mutate(df.entry_allow = ifelse(df.entry_allow == 1, "Allow many", 
+                  ifelse(df.entry_allow == 2, "Allow some", ifelse(df.entry_allow == 3, "Allow few", "Allow none")))) ## Change the numbers for names
+
+data_fig2$df.entry_allow = factor(data_fig2$df.entry_allow, c("Allow many", "Allow some","Allow few","Allow none" )) ## Reorganize the order
+
+data_fig2 %>% ggplot(., aes(x = df.entry_allow,  fill = factor(df.treatment))) + ## Plot the data
+  geom_bar(position = position_dodge()) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_manual(name = " ", 
+                     values = c("deepskyblue4", "#a7a8aa"),
+                     labels = c("Professional migrants", "Unskilled workers")) +
+  theme_minimal() +
+  labs(x = "Should allow immigrants to come and live here?",
+       y = "Percentage of retired men")
+```
+As the picture shows, the percentage of retired men that answered **allow many** and **allow some** for the question including **professional migrants** are higher than for the question including **unskilled workers**. This shows that the sample is more prone to restrictive immigration policies concerning unskilled workers. The author concludes that if job market competition is the main cause of public opinion being less favorable to immigration, then there would not be an variation across retired men regarding professional and unskilled workers.
+
+## Extension part
+
+For the extension part, I decided to further analyze the socio-tropic versus ego-tropic motivation of individuals concerning immigration. I do not agree with the author's conclusion that individuals' socio-tropic orientations towards immigration likely override their ego-tropic ones. I do not agree that people prefer professional migrants than unskilled workers solely based on the economy. I think that the ethnicity of the migrants and racism play a big role in attitude towards immigration.
+
+My hypothesis is that the ethnicity of the immigrants changes the public opinion on immigration, with individuals more likely to accept white immigrants than immigrants from a different ethnicity. To test my hypothesis, I use the OLS model with control variables and the importance of the ethnicity of the immigrants as a moderator. 
+
+- Dependent variable is the same used by the author: if immigration is bad (1) or good (10) for the economy. In the dataset, the variable is **imbgeco** 
+- Independent variable is: peoples' perception of the economy **stfeco**. The question asked for the participants of the survey was "How satisfied are you with the present state of the economy?", with 0 "Highly unsatisfied" and 10 "Highly satisfied"
+- My moderator is: qualification for immigration: be white **qfimwht**. The question asked for the participants of the survey was "How important should it be for the immigrants to be white?", with 0 "Extremely unimportant" and 10 "Extremely important"  
+- My control variables are: education, income, left-right scale and country
+
+My explanation of the model is that the more people are satisfied with the economy, the more willing they will be to think that immigration is good for the economy. On the other hand, if they think the economy is going bad, they will probably think that immigration is bad for the economy. However, maybe racism (represented, in this analysis, by the variable "be white") may play a role in the perception of people about immigration. Maybe for those people that it is important for the immigrant to be white, even when satisfied with the economy, might still think that immigration is bad for the economy.
+
+To test this explanation, I first plot the data dividing individuals who think that it is very important for immigrants to be white against individuals that think this is not important.
+
+
+
+```{r}
+rep_df <- data.frame(rep_df$eduyrs, rep_df$lrscale, rep_df$brncntr, rep_df$hinctnta, rep_df$imbgeco, rep_df$imtcjob, rep_df$imbleco, rep_df$cntry, rep_df$ppltrst, rep_df$stfeco, rep_df$imsmetn, rep_df$imdfetn, rep_df$eimpcnt, rep_df$impcntr, rep_df$imwbcnt, rep_df$qfimedu, rep_df$qfimwht, rep_df$qfimwsk, rep_df$qfimcmt, rep_df$acetalv, rep_df$pplstrd, rep_df$gvrfgap, rep_df$gvtrimg, rep_df$dfegcf, rep_df$dfegcon, rep_df$dfeghbg, rep_df$smegbli, rep_df$smctmbe, rep_df$aljewlv, rep_df$almuslv, rep_df$algyplv, rep_df$alpfpe, rep_df$alpfpne, rep_df$allbpe, rep_df$allbpne, rep_df$gndr) ## Keep only the variables interesting to our analysis 
+
+rep_df <- rep_df %>% ## Create a new colum with categorial data on the variable "qfimwht"
+  dplyr::mutate(category = case_when(rep_df.qfimwht <= 2  ~ "Unimportant", rep_df.qfimwht <= 5  ~  "Little important", rep_df.qfimwht <= 7  ~  "Somehow important", rep_df.qfimwht <= 10  ~  "Very important"))
+
+rep_df$category = factor(rep_df$category, c("Unimportant", "Little important","Somehow important", "Very important")) ## Reoreganize the order 
+
+rep_df %>%
+   drop_na(category) %>%
+   drop_na(rep_df.imbgeco) %>%
+   ggplot(., aes(x = category, y = rep_df.imbgeco, colour = factor(category))) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(x = "Importance of immigrants to be white",
+       y = "Immigration is bad/good for economy",
+       colour = "")
+```
+
+The plot shows that the mean of the variable "immigration is bad/good for economy" changes for individuals that think that immigrants being white is very important. For people that being white is little or somehow important, the data distribution seems to be similar. To explore the heterogeneous effect of racism on the I run a regression analysis interacting racism with satisfaction with the economy on people's perception of migration on economy.
+
+```{r}
+texreg::screenreg(lm(rep_df.imbgeco ~ rep_df.stfeco*category + rep_df.eduyrs + rep_df.lrscale + rep_df.hinctnta + rep_df.cntry, rep_df), custom.model.names = c("Economic perception based on racism"), custom.coef.map = list("(Intercept)" = "Intercept", "rep_df.stfeco" = "Economic perception", "categoryLittle important" = "Be white: Little important", "categorySomehow important" = "Be white: Somehow important", "categoryVery important" = "Be white: Very important", "rep_df.eduyrs" = "Education", "rep_df.lrscale" = "Left-right", "rep_df.hinctnta" = "Income", "rep_df.stfeco:categoryLittle important" = "Interaction: Little important", "rep_df.stfeco:categorySomehow important" = "Interaction: Somehow important", "rep_df.stfeco:categoryVery important" = "Interaction: Very important")) ## Run the model
+```
+
+The output of the regression shows a difference in effect of people's satisfaction with economy on their perception that immigration is good or bad for the economy based on how they feel about the ethnicity of immigrants. Holding everything else constant, for people who think that immigrants being white is unimportant, the $ß$ is 2.75. For people who think that immigrants being white is very important, the $ß$ is 1.39. The more people care about immigrants being white, the less they will think that immigration is good for the economy. The interaction is only statistically significant for people who consider the immigrants to be white very important or somehow important. This can mean that for people who consider the immigrants to be white very important, even if they are satisfied with the economy, they will be less willing to consider immigration good for the economy.
+
+```{r}
+ggpredict(lm(rep_df.imbgeco ~ rep_df.stfeco*category + rep_df.eduyrs + rep_df.lrscale + rep_df.hinctnta + rep_df.hinctnta + rep_df.cntry, rep_df), terms = c("rep_df.stfeco","category"))
+
+texreg::screenreg(margins::margins(lm(rep_df.imbgeco ~ rep_df.stfeco*category + rep_df.eduyrs + rep_df.lrscale + rep_df.hinctnta + rep_df.hinctnta + rep_df.cntry, rep_df), variables = "rep_df.stfeco", at = list(category = c("Unimportant", "Little important","Somehow important", "Very important"))))
+```
+
+The predicted values table and the marginal effect also shows signs of heterogeneity. However, the size of the heterogeneity appears not to be so big. Further research would be necessary to assess if racism really affects the public opinion about immigration.
+
+
+
+
+
+The analysis was run under OS X 10.15.6 using R version 4.0.4. The following R software packages were used: dplyr (Wickham et al. 2021), tidyr (Wickham, 2020), ggplot2 (Wickham, 2016), readr  (Wickham et al. 2020), tidyverse (Wickham et al. 2019), ggdag (Barrett, 2021), dagitty (Zander et al. 2016), margins (Leeper, 2021), ggeffects (Lüdecke, 2018), effects (Fox et al. 2019), haven (Wickham et al. 2020), estimatr (Blair et al. 2021), texreg (Leifeld, 2013).
+
+## References
+
+Hadley Wickham (2020). tidyr: Tidy Messy Data. R package version 1.1.2.   https://CRAN.R-project.org/package=tidyr
+
+H. Wickham. ggplot2: Elegant Graphics for Data Analysis. Springer-Verlag New York, 2016.
+
+Sam Firke (2021). janitor: Simple Tools for Examining and Cleaning Dirty Data. R package version 2.1.0.
+  https://CRAN.R-project.org/package=janitor
+  
+Wickham et al., (2019). Welcome to the tidyverse. Journal of Open Source Software, 4(43), 1686,
+  https://doi.org/10.21105/joss.01686
+
+Malcolm Barrett (2021). ggdag: Analyze and Create Elegant Directed Acyclic Graphs. R package version 0.2.3.
+  https://CRAN.R-project.org/package=ggdag
+
+Johannes Textor, Benito van der Zander, Mark K. Gilthorpe, Maciej Liskiewicz, George T.H. Ellison (2016). Robust
+  causal inference using directed acyclic graphs: the R package 'dagitty'. International Journal of Epidemiology
+  45(6):1887-1894.
+
+Thomas J. Leeper (2021). margins: Marginal Effects for Model Objects. R package version 0.3.26.
+
+L<U+00FC>decke D (2018). "ggeffects: Tidy Data Frames of Marginal Effects from Regression Models." _Journal of Open
+Source Software_, 3(26), 772. doi: 10.21105/joss.00772 (URL: https://doi.org/10.21105/joss.00772).
+
+Graeme Blair, Jasper Cooper, Alexander Coppock, Macartan Humphreys and Luke Sonnet (2021). estimatr: Fast Estimators
+  for Design-Based Inference. R package version 0.30.2. https://CRAN.R-project.org/package=estimatr
+
+Hadley Wickham and Evan Miller (2020). haven: Import and Export 'SPSS', 'Stata' and 'SAS' Files. R package version
+  2.3.1. https://CRAN.R-project.org/package=haven
+  
+John Fox, Sanford Weisberg (2018). Visualizing Fit and Lack of Fit in Complex Regression Models with Predictor Effect
+  Plots and Partial Residuals. Journal of Statistical Software, 87(9), 1-27. URL
+  https://www.jstatsoft.org/article/view/v087i09.
+
+Hadley Wickham and Jim Hester (2020). readr: Read Rectangular Text Data. R package version 1.4.0. https://CRAN.R-project.org/package=readr
+
+Hadley Wickham, Romain François, Lionel Henry and Kirill Müller (2021). dplyr: A Grammar of Data Manipulation. R package version 1.0.6. https://CRAN.R-project.org/package=dplyr
