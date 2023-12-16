@@ -1,0 +1,368 @@
+---
+title: "Logistic Regression"
+subtitle: "2015 migration crisis in Europe and xenophobic attitudes: a cross national comparison"
+author: "Ana Elisa von Borstel (ana-borstel)"
+date: "2023-11-19"
+output:
+  html_document:
+    code_folding: hide
+    df_print: paged
+    highlight: tango
+    theme: cosmo
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+
+library(haven)
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(table1)
+library(ggplot2)
+library(questionr) 
+library(gtsummary)
+library(descr)
+library(lmtest)
+library(stargazer)
+library(questionr)
+library(scales)
+library(sjPlot) 
+
+data_2012 <- read_dta("~/Documents/Data Analysis Portfolio/Logistic regression/ESS6e02_4.dta")
+data_2016 <- read_dta("~/Documents/Data Analysis Portfolio/Logistic regression/ESS8e02_2.dta")
+data_2018 <- read_dta("~/Documents/Data Analysis Portfolio/Logistic regression/ESS9e03_1.dta")
+
+```
+
+```{r}
+#filter countries of analysis
+data_2012 <- dplyr::filter (data_2012, cntry == "FR" |cntry =="DE"|cntry =="IT"|cntry =="ES")
+
+data_2016 <- dplyr::filter (data_2016, cntry == "FR" |cntry =="DE"|cntry =="IT"|cntry =="ES")
+
+data_2018 <- dplyr::filter (data_2018, cntry == "FR" |cntry =="DE"|cntry =="IT"|cntry =="ES")
+
+#create column year
+data_2012 <- dplyr::mutate(data_2012, year = 2012)
+data_2016 <- dplyr::mutate(data_2016, year = 2016)
+data_2018 <- dplyr::mutate(data_2018, year = 2018)
+
+#select variables of analysis 
+data_2012 <- dplyr::select(data_2012, imwbcnt, imbgeco, cntry, year, gndr, eisced, hincfel, agea)
+data_2016 <- dplyr::select(data_2016, imwbcnt, imbgeco, cntry, year, gndr, eisced, hincfel, agea)
+data_2018 <- dplyr::select(data_2018, imwbcnt, imbgeco, cntry, year, gndr, eisced, hincfel, agea)
+
+#combine datasets
+data <- rbind(data_2012, data_2016, data_2018)
+
+
+#clean variables
+data <- dplyr::filter (data, imwbcnt>=0 & imwbcnt<=10) %>% 
+        dplyr::filter( imbgeco>=0 & imbgeco<=10) %>%
+        dplyr::filter (gndr==1 | gndr==2) %>% 
+        dplyr::filter (eisced>=1 & eisced<=7) %>% 
+        dplyr::filter( imbgeco>=0 & imbgeco<=10) %>%         
+        dplyr::filter(hincfel>=1 & hincfel<=4)
+
+#create new categories
+data <- data %>% #re-organize categories
+  mutate(DEP = case_when(imwbcnt < 5 ~ 1,
+                         imwbcnt <= 10 ~ 0)) %>% 
+  mutate(DEP_2 = case_when(imbgeco < 6 ~ 1, 
+imbgeco <11 ~ 0)) %>%
+  mutate(AGE = case_when(agea< 30 ~ "Age 18-29",
+agea< 60 ~ "Age 30-59",
+agea< 80 ~ "Age 60-79")) %>%
+  mutate(GENDER = case_when(gndr== 1 ~ "Men",
+gndr== 2 ~ "Women",)) %>%
+mutate(EDU = case_when(eisced<= 2 ~ "1-Lower secondary",
+eisced<= 4 ~ "2-Upper secondary",
+eisced <=7 ~ "3-Tertiary")) %>%
+  mutate(EMP = case_when(hincfel<= 2 ~ "1-No economic difficulty",
+                         hincfel<= 4 ~ "2-Economic difficulty"))%>%
+  mutate(COUNTRY = case_when(cntry == "ES" ~ "1-Spain", 
+                             cntry == "DE" ~ "2-Germany",
+                             cntry == "FR" ~ "3-France",
+                             cntry == "IT" ~ "4-Italy"))%>% 
+  mutate(TIME = case_when(year == 2012 ~ "2012", 
+                          year == 2016 ~ "2016",
+                          year == 2018 ~ "2018")) 
+
+hex <- hue_pal()(4) #color pallet for data visualization
+
+#code for creating interactions
+data$INT <- "NA"
+data$INT[data$cntry=="ES" & data$TIME=="2012"] <- "07: Spain 2012"
+data$INT[data$cntry=="ES" & data$TIME=="2016"]   <- "08: Spain 2016"
+data$INT[data$cntry=="ES"  & data$TIME=="2018"] <- "09: Spain 2018"
+data$INT[data$cntry=="DE" & data$TIME=="2012"] <- "04: Germany 2012"
+data$INT[data$cntry=="DE" & data$TIME=="2016"]   <- "05: Germany 2016"
+data$INT[data$cntry=="DE"  & data$TIME=="2018"] <- "06: Germany 2018"
+data$INT[data$cntry=="FR" & data$TIME=="2012"] <- "10: France 2012"
+data$INT[data$cntry=="FR" & data$TIME=="2016"]   <- "11: France 2016"
+data$INT[data$cntry=="FR"  & data$TIME=="2018"] <- "12: France 2018"
+data$INT[data$cntry=="IT" & data$TIME=="2012"] <- "01: Italy 2012"
+data$INT[data$cntry=="IT" & data$TIME=="2016"]   <- "02: Italy 2016"
+data$INT[data$cntry=="IT"  & data$TIME=="2018"] <- "03: Italy 2018"
+
+```
+
+Abstract: This paper was written for the Final Data Analysis Project for the class "Applied Logistic Regression" under the Master of Public Policy at Hertie School. It uses data from the European Social Survey Round 6 (2012), Round 8 (2016) and Round 9 (2018) to compare xenophobic attitudes before and after the 2015 migration crisis in Europe. The countries of analysis are Spain, France, Italy, and Germany, which were somehow involved in the European 2015 migration crisis. I test if xenophobic attitudes increased in countries that received a high flow of migrants, such as Italy, or a high number of asylum seekers' applications, such as Germany; in comparison with countries that did not receive many migrants and refugees, such as France and Spain. The results show that xenophobic attitudes increased in Germany and Italy from 2012 to 2016 and 2018; whereas it decreased in Spain and France in the same period of analysis. I conclude that there is evidence that a high number of asylum seekers applications or an unorderly flow of migrants can increase xenophobic attitudes.
+
+## Introduction
+
+In 2015, Europe experienced one of its biggest migration & refugee crisis since World War II. In 2015 alone, more than 1 million people arrived in Italy, Cyprus, Malta, Greece, and Spain, mostly coming from Syria (UNHCR 2022). In 2016, the reported number of dead and missing persons in the Mediterranean were more than 5,000 people (IOM 2022). If in 2014 and beginning of 2015 there were plenty of examples of solidarity among Europeans, with rescuing boats in the Mediterranean and Germany warmly welcoming asylum seekers, the situation deteriorated with the closure of borders in central Europe and with the increase in popularity of right-wing politicians.
+
+The aftermath of the 2015 European migration crisis was a divided Europe, with some countries asking for more solidarity and responsibility sharing, while others were closing their borders and refusing to accept asylum seekers. The failure of the European Union to provide a coordinated and efficient response to the 2015 crisis resulted in a disbelief in the European institutions, restriction of borders and the rise of politicians with xenophobic and anti-EU speeches.
+
+This paper proposes to analyze the xenophobic attitudes in Western countries involved in the 2015 migration crisis in an attempt to elucidate how migration crisis can affect the public opinion and domestic and regional politics. The main research question this paper seeks to answer is: Did the 2015 migration crisis in Europe affect the attitude towards migrants in France, Germany, Spain, and Italy?
+
+To answer this question, a logistic regression with data from the European Social Survey is used to measure the change in xenophobic attitudes in the selected countries in the before and after crisis. The analysis also seeks to answer the following questions: Was there a difference between countries that received a higher number of asylum applications versus countries that received a lower number? Countries facing a disorderly flow of migrants had more xenophobic attitudes after the crisis in comparison to other countries?
+
+## Data & Analytical Sample
+
+The data for this analysis comes from the European Social Survey (ESS), a multi-country survey administered in more than 30 European countries every 2 years since 2002, to monitor changes in public attitudes and social indicators. For my analysis, I use Round 6 (conducted from August 2012 to December 2013), Round 8 (conducted from August 2016 to December 2017) and Round 9 (conducted from August 2018 to January 2020). I decided not to use the Round 7, because the interviews took place between January 2014 and December 2015, therefore it would not be possible to properly separate the interviews in before and after crisis, since the flow of migrants to Europe started to increase in 2014, reaching its peak in 2015. Additionally, each country experienced different flows of migrants in different time frames in 2014/2015, making it difficult to isolate the before and after.
+
+I restricted the data sets to Spain, France, Germany, and Italy, and combined the Round 6, 8 and 9 datasets. The total sample comprises 26,062 respondents. After deleting respondents with missing information on the variables of analysis, the final analytical sample decreased to 24,612, a 6% reduction from the total sample.
+
+The dependent variable, ***attitude towards migrants***, is constructed using the question "Is [country] made a worse or better place to live by people coming to live here from other countries?". The answers are on a scale of 0 to 10, in which 0 is "worse place to live" and 10 is "better place to live". I recoded the answers 0 to 4 as "xenophobic" and 5 to 10 as "not xenophobic".
+
+The independent variable ***year***  was created using the year that the Round was published, and it was coded as categorical, instead of numeric variable. The independent variable ***education*** was created by grouping the "Highest level of education" variable into "lower secondary", "upper secondary" and "tertiary". The variable ***economic difficulty*** was grouped into two levels "economic difficulty" and "no economic difficulty". The variable ***age*** was grouped into 3 categories and the variable ***gender*** was used as it is.
+
+The table below shows the sample statistics of the independent variables. The country with fewer respondents is Spain and the most respondents is Germany. Data is overall well distributed across the year, country, gender, age and education. The data was not weighted for the sake of simplicity.
+
+```{r descriptive}
+table1::label (data$COUNTRY) <- "Country"
+table1::label (data$TIME) <- "Year"
+table1::label (data$AGE) <- "Age"
+table1::label (data$GENDER) <- "Gender"
+table1::label (data$EDU) <- "Education level"
+table1::label (data$EMP) <- "Economic hardship"
+table1::table1(~COUNTRY+TIME+AGE+GENDER+EDU+EMP | COUNTRY, data=data)
+```
+
+
+The method used for the analysis is the binary logistic regression and the results are presented in terms of odds ratio and predicted probabilities for the interaction model. In the first model, I estimate a binary logistic regression that controls for country context, year (before and after the 2015 migration crisis), education, gender and financial hardship. In the second model, I interact country context and year (before and after), in which time works as a moderator, and keep the same control variables.
+
+## Data Descriptive
+
+The Cross-table 1 shows that among respondents that participated in the 2012 survey, 33% demonstrated xenophobic attitude in comparison to 38% respondents in the 2016 survey and 35% in the 2018 survey. The difference between the 2012 and 2016 group is of 5 percentage points, and the difference between 2012 and 2018 is of 2 percentage point. It seems that in the year just after the 2015 migration crisis in Europe, respondents demonstrated more xenophobic attitudes then the survey conducted in 2012 and 2018.
+
+```{r}
+TABLE1 <- table(data$DEP, data$year) 
+TABLE2 <- prop.table(TABLE1,2)
+TABLE3 <- as.data.frame(TABLE2)
+
+ggplot(TABLE3, aes(fill=Var1, x=Var2, y=Freq)) + 
+  geom_bar(stat="identity")+
+  geom_text(aes(label = round(Freq,digits=2)), size = 3, hjust = 0.5, vjust = -.5, position = "stack")+
+  scale_y_continuous(labels=scales::percent) +
+  ggtitle("Cross-table 1: Xenophobic attitude in 2012, 2016 and 2018") +
+  ylab("")+
+  xlab("") +
+  scale_fill_manual(name = "", labels = c("Not xenophobic", "Xenophobic"),
+                    values = c("grey", "coral3")) +
+  theme_classic()
+```
+
+The Person's Chi-squared test for Table 1 shows that the association is statistically significant at a 1% level, since the p-level is lower than 0.01 at 2 degrees of freedom. There is strong evidence to reject the null hypothesis that the dependent and independent variables are not related.
+
+```{r}
+chisq.test(data$DEP, data$year, correct = F)
+```
+
+The cross table for each country shows that xenophobic attitudes decreased in France and Spain from 2012 to 2018, whereas it increased in Germany and Italy from 2012 to 2016, and then decreased from 2016 to 2018. Italy was the country with the highest increase in xenophobic attitudes from 2012 to 2016 with a 16 percentage points increase.
+
+```{r}
+#france
+
+data_france <- dplyr::filter (data, cntry == "FR")
+
+TABLE1F <- table(data_france$DEP, data_france$year) 
+TABLE2F <- prop.table(TABLE1F,2)
+TABLE3F <- as.data.frame(TABLE2F)
+
+ggplot(TABLE3F, aes(fill=Var1, x=Var2, y=Freq)) + 
+  geom_bar(stat="identity")+
+  geom_text(aes(label = round(Freq,digits=2)), size = 3, hjust = 0.5, vjust = -.5, position = "stack")+
+  scale_y_continuous(labels=scales::percent) +
+  ggtitle("Cross-table 2: Xenophobic attitude in France") +
+  ylab("")+
+  xlab("") +
+  scale_fill_manual(name = "", labels = c("Not xenophobic", "Xenophobic"),
+                    values = c("grey", "#00BFC4")) +
+  theme_classic()
+```
+
+```{r}
+#Italy
+data_italy <- dplyr::filter (data, cntry == "IT")
+
+TABLE1I <- table(data_italy$DEP, data_italy$year) 
+TABLE2I <- prop.table(TABLE1I,2)
+TABLE3I <- as.data.frame(TABLE2I)
+
+ggplot(TABLE3I, aes(fill=Var1, x=Var2, y=Freq)) + 
+  geom_bar(stat="identity")+
+  geom_text(aes(label = round(Freq,digits=2)), size = 3, hjust = 0.5, vjust = -.5, position = "stack")+
+  scale_y_continuous(labels=scales::percent) +
+  ggtitle("Cross-table 3: Xenophobic attitude in Italy") +
+  ylab("")+
+  xlab("") +
+  scale_fill_manual(name = "", labels = c("Not xenophobic", "Xenophobic"),
+                    values = c("grey", "#C77CFF")) +
+  theme_classic()
+```
+
+```{r}
+#Germany
+data_germany <- dplyr::filter (data, cntry == "DE")
+
+TABLE1G <- table(data_germany$DEP, data_germany$year) 
+TABLE2G <- prop.table(TABLE1G,2)
+TABLE3G <- as.data.frame(TABLE2G)
+
+ggplot(TABLE3G, aes(fill=Var1, x=Var2, y=Freq)) + 
+  geom_bar(stat="identity")+
+  geom_text(aes(label = round(Freq,digits=2)), size = 3, hjust = 0.5, vjust = -.5, position = "stack")+
+  scale_y_continuous(labels=scales::percent) +
+  ggtitle("Cross-table 4: Xenophobic attitude in Germany") +
+  ylab("")+
+  xlab("") +
+  scale_fill_manual(name = "", labels = c("Not xenophobic", "Xenophobic"),
+                    values = c("grey", "#F8766D")) +
+  theme_classic()
+```
+
+```{r}
+#Spain
+
+data_spain <- dplyr::filter (data, cntry == "ES")
+
+TABLE1S <- table(data_spain$DEP, data_spain$year) 
+TABLE2S <- prop.table(TABLE1S,2)
+TABLE3S <- as.data.frame(TABLE2S)
+
+ggplot(TABLE3S, aes(fill=Var1, x=Var2, y=Freq))  + 
+  geom_bar(stat="identity")+
+  geom_text(aes(label = round(Freq,digits=2)), size = 3, hjust = 0.5, vjust = -.5, position = "stack")+
+  scale_y_continuous(labels=scales::percent) +
+  ggtitle("Cross-table 5: Xenophobic attitude in Spain") +
+  ylab("")+
+  xlab("") +
+  scale_fill_manual(name = "", labels = c("Not xenophobic", "Xenophobic"),
+                    values = c("grey", "#7CAE00")) +
+  theme_classic()
+```
+
+## Model 1 - without interaction
+
+The results for Model 1 shows that, controlling for country, gender, education and financial hardship, the odds of respondents presenting xenophobic attitudes is 13% higher in 2016 in comparison to 2012. The odds of respondents presenting xenophobic attitudes in 2018 is 9% lower than in 2012. Both results are statistically significant at 1% level, meaning that xenophobic attitudes increased in 2016 (the year after the 2015 migration crisis in Europe) and then decreased in 2018. There is strong evidence that the flow of migrants towards Europe could have impacted xenophobic attitudes in countries involved in the Mediterranean crisis.
+
+Controlling for time and socio-demographic variables, Italy is the country with the highest odds of respondents presenting xenophobic attitudes, followed by France, Germany and Spain. Respondents in Italy have 227% higher odds of presenting xenophobic attitudes in comparison to respondents in Spain. Respondents in Germany have 55% higher odds of being xenophobic in comparison to Spain.
+
+The control variables show that older respondents present higher odds of xenophobic attitudes. Respondents aged 60 to 79 have 119% higher odds of being xenophobic in comparison to respondents aged 18 to 29. Respondents with tertiary education have 62% lower odds of being xenophobic in comparison with respondents with lower secondary education. Finally, respondents with economic difficulty have 43% higher odds of being xenophobic in comparison with respondents without economic difficulty.
+
+```{r model 1}
+MODEL01 <- glm(DEP ~ COUNTRY+TIME+AGE+GENDER+EDU+EMP, data = data, family = binomial())
+tbl_regression(MODEL01, exponentiate = TRUE)
+```
+
+## Model 2 - with interaction
+
+Model 2 is an interaction in which time works as a moderator. The results show that respondents in Italy in 2016 have 81% higher odds of showing xenophobic attitudes than respondents in the same country in 2012. The results are statistically significant at 1% level, meaning that xenophobic attitudes increased in Italy in 2016 in comparison to 2012. In 2018, the odds of respondents presenting xenophobic attitudes in Italy is 26% higher than in 2012. 
+
+Germany presents a similar pattern in comparison to Italy, but in a lower intensity: xenophobic attitudes increased in Germany from 2012 to 2016 and decreased from 2016 to 2018. The odds of respondents in Germany in 2012 presenting xenophobic attitudes is 39% lower than in Italy in 2012. In 2016, the odds of respondents being xenophobic in Germany is 21% lower than in Italy 2012. In 2018, the odds of respondents being xenophobic in Germany is 36% lower than in Italy in 2012. These results can be visualized in the Forest Plot for Model 2, in which the odds of xenophobic attitudes in Germany are very similar for 2012 and 2018 and are slightly higher for 2016.
+
+France and Spain, in contrast to Italy and Germany, had a decreased in xenophobic attitudes in 2016 and 2018. The Forest Plot for Model 2 shows that the odds of xenophobic attitudes in France and Spain decreased from 2012 to 2018. All results are statistically significant at a 1% level. 
+
+```{r model 2}
+MODEL02 <- glm(DEP ~ INT+AGE+GENDER+EDU+EMP, data = data, family = binomial())
+tbl_regression(MODEL02, exponentiate = TRUE)
+
+```
+
+## Forest Plot
+
+```{r}
+TEST01<-summary(MODEL02)$coefficients
+CI.vector <- as.data.frame(exp(confint(MODEL02))) 
+TEST02 <- cbind(TEST01, CI.vector)
+TEST02$Labels = c("Intercept", "Italy 2016", "Italy 2018", "Germany 2012", "Germany 2016",
+                  "Germany 2018", "Spain 2012", "Spain 2016", "Spain 2018", "France 2012", 
+                  "France 2016", "France 2018", "Age 30-59", "Age 60-79", 
+                  "Women",  "Upper Secondary", "Tertiary", "Economic difficulty")
+TEST02$OR = exp(TEST02$Estimate) 
+TEST03<-data.frame(TEST02)
+
+ggplot(TEST02, aes(x = OR, y = Labels)) +
+  geom_point(size = 2.5, color = "orange")+ 
+  geom_vline(aes(xintercept = 1), size = .25, linetype = "dashed") + 
+  ggtitle("Forest plot of Model 2") +
+  ylab("") +
+  xlab("Odds ratio")+
+  geom_errorbarh(aes(xmax = `97.5 %`, xmin = `2.5 %`, height = .1))+
+  theme_get()
+
+```
+
+##Likelihood ratio test
+
+To assess the overall significance of Model 2 and if the interaction improved the fit of the model in comparison to Model 1, I conducted a likelihood ratio test. The result of the test shows that the inclusion of the interaction improved the fit of the model. There is strong evidence that time worked as a moderator variable, affecting the strength and direction of xenophobic attitudes in Spain, France, Italy and Germany.
+
+```{r}
+
+logLik(MODEL01)
+logLik(MODEL02)
+
+lrtest(MODEL01, MODEL02) 
+
+```
+
+## Conclusion
+
+This paper presents some evidence that migration crisis can have a negative impact in attitudes towards migrants in countries facing a high number of asylum applications, like in the case of Germany, or in countries facing a disorderly flow of migrants, such as Italy. Notwithstanding, there are some limitations to this research and results.
+
+First, only Western European countries were analyzed. France, Italy, Spain and Germany share some cultural aspects that might be different from Eastern countries, such as Poland, Hungary and Czech Republic, and from the Nordic countries, such as Finland and Sweden. Further research on xenophobic attitudes in these countries should be carried out for an overview of the 2015 migration crisis in Europe. However, the European Social Survey was not conducted in all these countries in 2012, 2016 and 2018.
+
+Second, the 2015 migration crisis concern mainly Syrians refugees and north Africa migrants/refugees. It is possible that racism and islamophobia might have biased respondents’ xenophobic attitudes. One further research that could bring more light to this bias is to observe the changes in xenophobic attitude after the Ukrainian 2022 migration crisis. Like the 2015 crisis, European countries also received a high flow of refugees fleeing from the Russian invasion of Ukraine. It is estimated that Europe is hosting more than 7 million Ukrainians until November 2022 (UNHCR 2022).
+
+Third, the question used for construction of the dependent variable does not make a distinction between refugees and migrants, nor properly defining what type of migration the question is referring to. Ceobanu and Escandell (2010) argue that research addressing attitude towards migration usually suffers from terminological issues, without a clear differentiation between migration (the phenomenon) and migrants (the persons) in the survey’s questions nor clarifying the type of migration. In the 2015 crisis, Europeans might have been unsatisfied with the European or domestic policies addressing the migration crisis, but this not necessarily translate that they were against the arrival of refugee/migrants.
+
+In conclusion, although the results of this paper present some evidence that the 2015 European migration crisis might have affected xenophobic attitudes in Italy and Germany, two of the most affected countries by the crisis, further research is necessary to generalize about the effect of crisis on xenophobic attitudes.    
+
+## References
+
+Ceobanu, A. M., & Escandell, X. (2010). Comparative analyses of public attitudes toward immigrants and immigration using multinational survey data: A review of theories and research. Annual Review of Sociology, 36, 309–328.
+
+European Social Survey European Research Infrastructure (ESS ERIC). (2018). ESS6 - integrated file, edition 2.4 [Data set]. Sikt - Norwegian Agency for Shared Services in Education and Research. https://doi.org/10.21338/ESS6E02_4
+
+European Social Survey European Research Infrastructure (ESS ERIC). (2020). ESS8 - integrated file, edition 2.2 [Data set]. Sikt - Norwegian Agency for Shared Services in Education and Research. https://doi.org/10.21338/ESS8E02_2
+
+European Social Survey European Research Infrastructure (ESS ERIC). (2021). ESS9 - integrated file, edition 3.1 [Data set]. Sikt - Norwegian Agency for Shared Services in Education and Research. https://doi.org/10.21338/ESS9E03_1
+
+IOM (2022). Flow Monitoring: Migration flows to Europe dead/missing. International Organization for Migration. Access on 18th November 2022. Available at https://migration.iom.int/europe/missing
+
+Margalit, Y., & Solodoch, O. (2022). Against the Flow: Differentiating Between Public Opposition to the Immigration Stock and Flow. British Journal of Political Science, 52(3), 1055-1075. doi:10.1017/S0007123420000940
+
+UNHCR (2022). Operational Data Portal: Mediterranean Situation. United Nations High Commissioner for Refugees. Access on 18th November 2022. Available at https://data.unhcr.org/en/situations/mediterranean
+
+**R Packages**
+
+Barnier J, Briatte F, Larmarange J (2022). _questionr: Functions to Make Surveys Processing Easier_. R package version 0.7.7, <https://CRAN.R-project.org/package=questionr>.
+
+H. Wickham. ggplot2: Elegant Graphics for Data Analysis. Springer-Verlag New York, 2016.
+
+Rich, B. (2021). table1. https://cran.r-project.org/web/packages/table1 (https://cran.r-project.org /web/packages/table1)
+
+Sjoberg DD, Whiting K, Curry M, Lavery JA, Larmarange J. Reproducible summary tables with the gtsummary package. The R Journal 2021;13:570–80. https://doi.org/10.32614/RJ-2021-053.
+
+Wickham H, François R, Henry L, Müller K (2022). _dplyr: A Grammar of Data Manipulation_. R package version 1.0.10,  <https://CRAN.R-project.org/package=dplyr>.
+
+Wickham H, Girlich M (2022). _tidyr: Tidy Messy Data_. R package version 1.2.1, <https://CRAN.R-project.org/package=tidyr>.
+
+
+
+
