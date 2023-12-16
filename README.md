@@ -1,4 +1,4 @@
-# Data-Analysis-Portfolio
+# Data Analysis Portfolio
 This portfolio showcases data analysis and visualizations done by me, both in academic and work related context. While the datasets are not provided due to either their non-public availability or the requirement of special permission for access, I cite the sources of the data in each case. Additionally, I make available the R scripts in R Markdown html format to facilitate the visualization of results. For that, download the html files and open them in your computer.
 
 In this folder you can find the following documents:
