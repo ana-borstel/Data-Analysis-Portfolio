@@ -8,4 +8,5 @@ In this folder you can find the following documents:
 - **Applied logistic regression:** code for data analysis using applied logistic regression.
 - **Fixed effects regression**
 - **Survival analysis**
+- **Instrumental variable:** replication of a published paper using instrumental variable. This analysis was done as a final project of the Statistics II class for my master's degree.
 - **Merge datasets using non-exact match**
