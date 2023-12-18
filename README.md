@@ -1,5 +1,5 @@
 # Data Analysis Portfolio
-This portfolio showcases data analysis, manipulation and visualizations done by me, both in academic and work related context. While the datasets are not provided due to either their non-public availability or the requirement of special permission for access, I cite the sources of the data in each case. Additionally, I make available the R scripts in R Markdown html format to facilitate the visualization of results. For that, download the html files and open them in your computer.
+This portfolio showcases data analysis, manipulation and visualizations done by me, both in academic and work related context. While the datasets are not provided due to either their non-public availability or the requirement of special permission for access, I cite the sources of the data in each case. Additionally, I make available the R scripts in R Markdown html format to facilitate the visualization of results. For that, download the html files and open them in your browser.
 
 In this folder you can find the following documents:
 - **Basic visualization in R:** data visualizations in R using ggplot. The data used for the visualizations is from the European Social Survey round 13. The objective of this file is to showcase the code of basic data vizualization done in R.
