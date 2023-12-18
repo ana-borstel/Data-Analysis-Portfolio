@@ -1,0 +1,486 @@
+---
+title: "Basic visualization in R"
+author: "Ana von Borstel"
+date: "2023-10-27"
+output:
+  html_document:
+    code_folding: hide
+    df_print: paged
+    highlight: tango
+    theme: cosmo
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      eval = TRUE,
+                      error = FALSE,
+                      message = FALSE,
+                      warning = FALSE,
+                      fig.align = "center")
+
+library(readr)
+library(tidyverse)
+library(ggplot2)
+library(waffle)
+library(ggridges)
+library(treemapify)
+library(scales)
+library(openxlsx)
+
+data_ESS10 <- read_csv("C:/Users/VONBORST/OneDrive - UNHCR/Power BI/ESS10.csv")
+
+```
+
+
+
+```{r}
+data <- select(data_ESS10, anweight, cntry, gndr, agea, eduyrs, eisced, mnactic, 
+               hincsrca, hincfel, imsmetn, imdfetn, impcntr, imbgeco, imueclt, imwbcnt)
+
+data <- filter(data, imsmetn < 7)
+
+data <- mutate(data, imsmetn_c = case_when(imsmetn == 1 ~ "Allow many",
+                                     imsmetn == 2 ~ "Allow some",
+                                     imsmetn == 3 ~ "Allow a few",
+                                     imsmetn == 4 ~ "Allow none"))
+
+
+data <- filter(data, imdfetn < 7)
+
+data <- mutate(data, imdfetn_c = case_when(imdfetn == 1 ~ "Allow many",
+                                           imdfetn == 2 ~ "Allow some",
+                                           imdfetn == 3 ~ "Allow a few",
+                                           imdfetn == 4 ~ "Allow none"))
+
+
+data <- filter(data, impcntr < 7)
+
+data <- mutate(data, impcntr_c = case_when(impcntr == 1 ~ "Allow many",
+                                         impcntr == 2 ~ "Allow some",
+                                         impcntr == 3 ~ "Allow a few",
+                                         impcntr == 4 ~ "Allow none"))
+
+
+data <- filter(data, imbgeco < 11)
+
+data <- filter(data, imueclt < 11)
+
+data <- filter(data, imwbcnt < 11)
+
+data <- mutate(data, average_attitude = rowMeans(select(data,imwbcnt, imueclt, imbgeco)))
+
+data <- mutate(data, coutry = case_when(cntry == "BE" ~ "Belgium",
+                                        cntry == "BG" ~ "Bulgaria",
+                                        cntry == "CH" ~ "Switzerland",
+                                        cntry == "CZ" ~ "Czechia",
+                                        cntry == "EE" ~ "Estonia",
+                                        cntry == "FI" ~ "Finland",
+                                        cntry == "FR" ~ "France",
+                                        cntry == "GB" ~ "United Kingdom",
+                                        cntry == "GR" ~ "Greece",
+                                        cntry == "HR" ~ "Croatia",
+                                        cntry == "HU" ~ "Hungary",
+                                        cntry == "IE" ~ "Ireland",
+                                        cntry == "IS" ~ "Iceland",
+                                        cntry == "IT" ~ "Italy",
+                                        cntry == "LT" ~ "Lithuania",
+                                        cntry == "ME" ~ "Montenegro",
+                                        cntry == "MK" ~ "North Macedonia",
+                                        cntry == "NL" ~ "Netherlands",
+                                        cntry == "NO" ~ "Norway",
+                                        cntry == "PT" ~ "Portugal",
+                                        cntry == "SI" ~ "Slovenia",
+                                        cntry == "SK" ~ "Slovakia"))
+
+data <- mutate(data, gender = case_when(gndr == 1 ~ "Male",
+                                        gndr == 2 ~ "Female"))
+
+data <- filter(data, agea < 999)
+
+data <- filter(data, eduyrs< 77)
+
+data <- filter(data, eisced > 0 & eisced < 8)
+
+data <- mutate(data, eisced_c = case_when(eisced == 1 ~ "Less than lower secondary",
+                                           eisced == 2 ~ "Lower secondary",
+                                           eisced == 3 ~ "Lower tier upper secondary",
+                                           eisced == 4 ~ "Upper tier upper secondary",
+                                           eisced == 5 ~ "Advanced vocational, sub-degree",
+                                           eisced == 6 ~ "Lower tertiary education, BA level",
+                                           eisced == 7 ~ "Higher tertiary education, >= MA level"))
+
+
+data$eisced_c <- factor(data$eisced_c, levels = c("Higher tertiary education, >= MA level", 
+                                                  "Lower tertiary education, BA level",
+                                                  "Advanced vocational, sub-degree",
+                                                  "Upper tier upper secondary",
+                                                  "Lower tier upper secondary",
+                                                  "Lower secondary",
+                                                  "Less than lower secondary"))
+
+
+
+data <- filter(data, hincsrca <= 8)
+
+data <- mutate(data, hincsrca_c = case_when(hincsrca == 1 ~ "Wages or salaries",
+                                           hincsrca == 2 ~ "Income from self-employment (excluding farming)",
+                                           hincsrca == 3 ~ "Income from farming",
+                                           hincsrca == 4 ~ "Pensions",
+                                           hincsrca == 5 ~ "Unemployment/redundancy benefit",
+                                           hincsrca == 6 ~ "Any other social benefits or grants",
+                                           hincsrca == 7 ~ "Income from investments, savings etc.",
+                                           hincsrca == 8 ~ "Income from other sources"))
+
+
+data <- filter(data, hincfel <= 4)
+
+data <- mutate(data, hincfel_c = case_when(hincfel == 1 ~ "Living comfortably on present income",
+                                          hincfel == 2 ~ "Coping on present income",
+                                          hincfel == 3 ~ "Difficult on present income",
+                                          hincfel == 4 ~ "Very difficult on present income"))
+
+data$hincfel_c <- factor(data$hincfel_c, levels = c("Living comfortably on present income", 
+                                            "Coping on present income", "Difficult on present income",
+                                            "Very difficult on present income"))
+```
+
+
+This document is a portfolio of data visualization in R language. It aims to showcase basic visualizations for survey data in R.
+
+The data used is from the European Social Survey round 10 - 2020. Democracy, Digital social contacts (available at <https://ess-search.nsd.no/en/study/172ac431-2a06-41df-9dab-c1fd8f3877e7>). The ESS is a cross-national survey conducted in selected countries in Europe since 2001. The aim of the survey is to monitor changing public attitudes and values in Europe. The methodology follows strict random probability sampling.
+
+After selecting the variables of analysis for this portfolio, the data was cleaned to exclude respondents with missing values. The original dataset has 37,611 observations, whereas the analytical dataset has 33,099 observations.
+
+The following variables were used in this portfolio:
+
+Variables concerning attitude toward migration:
+
+-   *imsmetn*: Allow many/few immigrants of same race/ethnic group as majority. Question in the survey: "To what extent do you think [country] should allow people of the same race or ethnic group as most [country]'s people to come and live here?" Allow none, allow a few, allow some, allow many.
+
+-   *imdfetn*: Allow many/few immigrants of different race/ethnic group from majority. Question in the survey: "How about people of a different race or ethnic group from most [country] people?" Allow none, allow a few, allow some, allow many.
+
+-   *impcntr*: Allow many/few immigrants from poorer countries outside Europe. Question in the survey: "How about people from the poorer countries outside Europe?" Allow none, allow a few, allow some, allow many.
+
+-   *imbgeco*: Immigration bad or good for country's economy. Question in the survey: "Would you say it is generally bad or good for [country]'s economy that people come to live here from other countries?" From a scale from 0 (bad for the economy) to 10 (good for the economy).
+
+-   *imueclt*: Country's cultural life undermined or enriched by immigrants. Question in the survey: "And, using this card, would you say that [country]'s cultural life is generally undermined or enriched by people coming to live here from other countries?" From a scale from 0 (cultural life undermined) to 10 (cultural life enriched).
+
+-   *imwbcnt*: Immigrants make country worse or better place to live. Question in the survey: Is [country] made a worse or a better place to live by people coming to live here from other countries? From a scale from 0 (worse place to live) to 10 (better place to live).
+
+Socio-demographic variables:
+
+-   *cntry*: Country.
+
+-   *gndr*: Gender.
+
+-   *agea*: Age calculated.
+
+-   *eisced*: Highest level of education, ES - ISCED. Answers: "less than lower secondary", "lower secondary", "lower tier upper secondary", "upper tier upper secondary", "advanced vocational, sub-degree", "lower tertiary education, BA level", and "higher tertiary education, \>= MA level".
+
+-   *hincsrca*: Main source of household income. Answers: "Wages or salaries", "Income from self-employment (excluding farming)", "Income from farming", "Pensions", " Unemployment/redundancy benefit", "Any other social benefits or grants", "Income from investments, savings etc.", "Income from other sources".
+
+-   *hincfel*: Feeling about household's income nowadays. Answers: "Living comfortably on present income", "Coping on present income", " Difficult on present income", "Very difficult on present income".
+
+-   *eduyrs* - Years of school education.
+
+## Graphs with a categorical variable
+
+**Bar chart**: the chart below shows the number of the survey respondents per country. Greece is the country with the higher number of respondents (around 2,500) and Iceland the lowest (500). Respondents are from a total of 22 countries.
+
+```{r}
+data %>% count(coutry) %>% ggplot(., aes(reorder(coutry, n), y = n))+
+  geom_bar(stat="identity", fill = "steelblue") +
+  labs(x = "", 
+       y = "n respondents", 
+       title = "Distribution of respondents by country")+
+  coord_flip()+
+  theme_classic()
+```
+
+**Bar chart with percentage (not weighted)**: the chart below shows the distribution of respondents based on how they feel about their income. The majority of respondents indicated they are "coping with present income". Only 6% of respondents indicated "very difficult on present income". However, the data is not weighted, which can create biased results.
+
+```{r}
+data %>%
+  count(hincfel_c) %>%
+  mutate(pct = n / sum(n),
+         pctlabel = paste0(round(pct*100), "%")) %>% 
+  ggplot(., aes(x = hincfel_c, y = pct)) + 
+  geom_bar(stat="identity", fill="lightblue") +
+  geom_text(aes(label = pctlabel), vjust=-0.25) +
+  labs(x = "Feel about income", 
+       y = "", 
+       title  = "Participants by how they feel about income")+
+  theme_classic()
+```
+
+**Bar chart with percentage (weighted)**: The chart below is the same as the above, but the data was weighted by the variable "anweight". It shows that the respondents "living comfortably on present income" were being underrepresented in the previous chart, whereas respondents "living very difficult on present income" were being overrepresented. It is indicated to use the ESS data weighted by the anweight variable, which corrects for differential selection probabilities within each country as specified by sample design, for nonresponse, for noncoverage, and for sampling error related to the four post-stratification variables, and takes into account differences in population size across countries. For more information, please check the "ESS Guide to Using Weights and Sample Design Indicators with ESS Data" available at <https://stessrelpubprodwe.blob.core.windows.net/data/methodology/ESS_weighting_data_1_2.pdf>.
+
+```{r}
+data %>% group_by(hincfel_c) %>% 
+  summarise(n = sum(anweight)) %>%
+  mutate(pct = n / sum(n),
+         pctlabel = paste0(round(pct*100), "%")) %>% 
+  ggplot(., aes(x = hincfel_c, y = pct)) + 
+  geom_bar(stat="identity", fill="steelblue") +
+  geom_text(aes(label = pctlabel), vjust=-0.25) +
+  labs(x = "Feel about income", 
+       y = "", 
+       title  = "Participants by how they feel about income (weighted)")+
+  theme_classic()
+```
+
+**Tree Map (weighted)**: The tree map below shows how respondents are distributed based on their main income activity. The majority of respondents indicated "wages or salaries" as their main income activity. Tree maps are not the best visualization in R for showcasing the sample distribution accurately, but, in this case, it is an interesting data visualization for highlighting the one or two main answers for a question.
+
+```{r}
+
+data %>% group_by(hincsrca_c) %>% 
+  summarise(n = sum(anweight)) %>% ggplot(., 
+                                    aes(fill = hincsrca_c, 
+                                        area = n, 
+                                        label = hincsrca_c)) +
+  geom_treemap() + 
+  geom_treemap_text(colour = "white", 
+                    place = "centre") +
+  labs(title = "Respondent distribution by main income activity (weighted)") +
+  theme(legend.position = "none")
+
+```
+
+## Graphs with a numerical variable
+
+**Histogram (not weighted)**: the histogram shows the distribution of participants by age. The chart is not weighted and the bin selected was 15, meaning that the data was divided in 15 bars.
+
+```{r}
+ggplot(data, aes(x = agea)) +
+  geom_histogram(fill = "steelblue", 
+                 color = "white", 
+                 bins = 15) + 
+  labs(title="Participants by age", 
+       subtitle = "number of bins = 15",
+       x = "Age",
+       y = "Count")+
+  theme_minimal()
+```
+
+**Histogram in percentage (weighted)**: the histogram below uses the same variables as the histogram above, but it is weighted and showed in percentage.
+
+```{r}
+ggplot(data, 
+       aes(x = agea, y= after_stat(count/sum(count)))) +
+  geom_histogram(aes(weight = anweight),
+    fill = "steelblue", 
+                 color = "white", 
+                 bins = 15) + 
+  labs(title="Participants by age (weighted)",
+       subtitle = "number of bins = 15",
+       y = "",
+       x = "Age") +
+  scale_y_continuous(labels = percent)+
+  theme_minimal()
+```
+
+**Density plot (weighted)**: The density chart below shows the distribution of respondents based on average of their responses for three questions related to attitudes towards immigrants: (1)Immigration bad or good for country's economy, (2)Country's cultural life undermined or enriched by immigrants, and (3)Immigrants make country worse or better place to live. The density plot shows that most of the sample size has a positive attitude towards immigrants (average higher than 5).
+
+```{r}
+ggplot(data, aes(x = average_attitude)) +
+  geom_density(aes(weight = anweight),fill = "lightblue") + 
+  labs(title = "Participants by attitude towards immigrants (weighted)",
+       y = "density",
+       x = "Average for questions related to attitude towards immigration")+
+  theme_classic()
+```
+
+The chart below shows how the density plot above changes for selected countries. Greece and Hungary show that most respondents have a negative attitude towards immigrants (average response lower than 5). Respondents in Switzerland and Norway show a more positive attitude towards immigrants.
+
+```{r}
+data %>% filter(cntry == "GR" | cntry == "HU" | cntry == "IT" | cntry == "CH" | cntry == "NO") %>%
+  ggplot(., aes(x = average_attitude)) +
+  geom_density(aes(weight = anweight),fill = "lightblue") + 
+  facet_wrap(~coutry)+
+  labs(title = "Participants by attitude towards immigrants (weighted)",
+       y = "density",
+       x = "Average for questions related to attitude towards immigration")+
+  theme_classic()
+```
+
+## Graphs with two categorical variables
+
+**Bar chart**: The bar chart below shows the distribution of respondents based on two categorical variables: feel about their income and allow many/few immigrants of different race/ethnic group as majority. It is interesting to notice that among respondents who indicated "allow none" for immigrants of different race/ethnic group, only few respondents are feeling "living comfortably on present income" in comparison to respondents that selected allow few, allow some and allow many.
+
+```{r}
+data$imdfetn_c <- factor(data$imdfetn_c, levels = c("Allow many", 
+                                                    "Allow some", "Allow a few",
+                                                    "Allow none"))
+
+ggplot(data, aes(x = imdfetn_c, fill = hincfel_c)) + 
+  geom_bar(position = "stack")+
+  labs(x = "", 
+       y = "n respondents",
+       fill="Feel about income",
+       title = "Allow many/few immigrants of different race/ethnic group as majority")+
+   scale_fill_brewer(palette = "Set2") +
+  theme_minimal()
+```
+
+**Bar plot with percentage (weighted)**: the bar plot in percentage allows for better comparison between groups of respondents. Among those who responded "allow many" to the question "allow many/few immigrants of different race/ethnic group as majority", half of them indicated living comfortably on present income. Among respondents who answered "allow none", only 20% or less indicated living comfortably on present income. The opposite can be observed for respondents who indicated "very difficult on present income": the proportion of those is higher among those who indicated "allow none" than among those who indicated "allow many".
+
+```{r}
+ggplot(data, aes(x = imdfetn_c, fill = hincfel_c)) + 
+  geom_bar(aes(weight = anweight),position = "fill") +
+  scale_y_continuous(breaks = seq(0, 1, .2), 
+                     label = percent) +
+  labs(x = "", 
+       y = "",
+       fill="Feel about income",
+       title = "Allow many/few immigrants of different race/ethnic group as majority (weighted)")+
+  scale_fill_brewer(palette = "Set2") +
+  theme_minimal()
+```
+
+## Graphs with two numerical variables
+
+**Scatterplot**: the plot below shows the relation between age of respondents and years of education. It is logically that older respondents are likely to have more years of education than younger respondents. The plot shows this is true for respondents under the age of 30. After 30, the relation between age and years of education is flatter.
+
+```{r}
+data %>%  filter (cntry == "IS") %>% ggplot(., 
+       aes(x = agea, y = eduyrs)) +
+  geom_point(color="cornflowerblue", 
+             size = 2, 
+             alpha=.8) +
+  scale_x_continuous(breaks = seq(15, 95, 10), 
+                     limits=c(15, 95)) + 
+  labs(x = "Age",
+       y = "Years of education",
+       title = "Age vs Years of education in Island")+
+  theme_minimal()
+```
+
+The chart below is restricted to respondents aged 30 or less. The correlation between the two variables are more easily perceived. A linear regression line was also added to the chart.
+
+```{r}
+data %>%  filter ( cntry == "IS" & agea <= 30) %>% ggplot(., 
+                                            aes(x = agea, y = eduyrs)) +
+  geom_point(
+             color="steelblue", 
+             size = 2, 
+             alpha=.8) +
+  geom_smooth(aes(weight = anweight),method = "lm")+
+  labs(x = "Age",
+       y = "Years of education",
+       title = "Age vs Years of education in Island for respondents <= 30")+
+  theme_minimal()
+```
+
+## Graphs with numerical and categorical variables
+
+**Density plot (weighted)**: The chart below shows the distribution of participants based on their average attitude towards immigrants (calculated based on the variables imbgeco, impcntr and imueclt) and how they feel about their present income. The chart shows that, on average, respondents living comfortably and respondents coping on present income have a more positive attitude towards immigrants. On the other hand, respondents feeling difficult or very difficult on present income have a more negative attitude towards immigrants.
+
+```{r}
+ggplot(data, aes(x = average_attitude, fill= hincfel_c)) +#continuous variable
+  geom_density(aes(weight = anweight),alpha = 0.4) + 
+  labs(title = "Participants by average attitude towards immigrants and feeling about income (weighted)",
+       x = "Average attitude towards immigrants",
+       y = "Density",
+       fill = "Feeling about income")+
+  theme_minimal()
+```
+
+**Spaghetti plot (not weighted)**: the chart shows the mean of respondents for the question "Are immigrants good or bad for economy? From a scale of 1 (bad) to 10 (good)" grouped by their education level and how they feel about their income. The results show that the mean of respondents with tertiary education is higher than respondents with other education levels, regardless of how they feel about their income. Nonetheless, it seems there is a correlation between the mean of respondents and how they feel about their income, with higher averages for respondents living comfortably on present income, regardless of their education level.
+
+```{r}
+
+data %>% mutate(hincfel_c = case_when(hincfel_c == "Living comfortably on present income" ~ "1.Living comfortably",
+                                          hincfel_c == "Coping on present income" ~ "2.Coping",
+                                          hincfel_c == "Difficult on present income" ~ "3.Difficult",
+                                          hincfel_c == "Very difficult on present income" ~ "4.Very difficult")) %>% 
+
+  group_by(eisced_c,hincfel_c)  %>% 
+  summarise(mean = mean(imbgeco)) %>% 
+  ggplot(., aes(x = hincfel_c, y = mean, group = eisced_c))+
+  geom_line(size = 1, aes(color = eisced_c))+
+  labs(x = "",
+       y = "Mean of respondents",
+       color = "Education level",
+       title = "Immigrants are good or bad for economy?",
+       subtitle = "From a scale of 1 (bad) to 10 (good).")+
+  theme_minimal()
+```
+
+**Box plot**: the chart shows the distribution of respondents from 5 countries in relation to the question ""Are immigrants good or bad for economy?". Respondents in Switzerland and Norway have a higher median than respondents from Italy, Hungary and Greece. Although Hungary and Greece present similar median for this variable, the distributions are different. Similarly, although Norway and Switzerland seem to have a similar distribution, they have different medians and quartiles.
+
+```{r}
+data %>% filter(cntry == "GR" | cntry == "HU" | cntry == "IT" | cntry == "CH" | cntry == "NO") %>% 
+  ggplot(., aes(x = coutry, y = imbgeco))+
+  geom_boxplot()+
+  labs(x = "",
+       y = "",
+       title = "Immigrants are good or bad for economy?",
+       subtitle = "From a scale of 1 (bad) to 10 (good).")+
+  theme_minimal()
+```
+
+**Violin plot**: the violin plot shows in more details how the data is ditributed, but fails in presenting the median and quartiles. The data used for the violin plot is the same used for the boxplot above.
+
+```{r}
+data %>% filter(cntry == "GR" | cntry == "HU" | cntry == "IT" | cntry == "CH" | cntry == "NO") %>% 
+  ggplot(., aes(x = coutry, y = imbgeco))+
+  labs(x = "",
+       y = "",
+       title = "Immigrants are good or bad for economy?",
+       subtitle = "From a scale of 1 (bad) to 10 (good).")+
+  geom_violin()
+```
+
+**Ridgeline chart**: the Ridgeline chart uses the same data as above to present the distribution in a different format
+
+```{r}
+data %>% filter(cntry == "GR" | cntry == "HU" | cntry == "IT" | cntry == "CH" | cntry == "NO") %>% 
+  ggplot(., 
+         aes(x = imbgeco, y = coutry, fill = coutry)) +
+  geom_density_ridges() + 
+  theme_ridges() +
+  labs("") +
+  theme(legend.position = "none") 
+```
+
+**Cleveland plot**: the chart below shows the mean of respondents for each country of the sample related to the question "Are immigrants good or bad for economy?". The countries were ordered to facilitate the identification of the countries with the higher means and a lower ones.
+
+```{r}
+data %>% group_by(coutry) %>% summarise(mean = mean(imbgeco)) %>% 
+ggplot(., aes(x=mean, 
+                     y=reorder(coutry, mean))) +
+  geom_point(color="indianred", size = 3) +
+  geom_segment(aes(x = 3, 
+                   xend = mean, 
+                   y = reorder(coutry, mean), 
+                   yend = reorder(coutry, mean)),
+               color = "grey") +
+  labs (x = "Mean",
+        y = "",
+        title = "Immigrants are good or bad for economy?",
+        subtitle = "From a scale of 1 (bad) to 10 (good).") +
+  theme_minimal() + 
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+```
+## References
+
+Wickham H, Averick M, Bryan J, Chang W, McGowan LD, François R, Grolemund G, Hayes A, Henry L,
+  Hester J, Kuhn M, Pedersen TL, Miller E, Bache SM, Müller K, Ooms J, Robinson D, Seidel DP, Spinu
+  V, Takahashi K, Vaughan D, Wilke C, Woo K, Yutani H (2019). “Welcome to the tidyverse.” _Journal of
+  Open Source Software_, *4*(43), 1686. doi:10.21105/joss.01686
+  <https://doi.org/10.21105/joss.01686>.
+  
+H. Wickham. ggplot2: Elegant Graphics for Data Analysis. Springer-Verlag New York, 2016.
+   
+Rudis B, Gandy D (2023). _waffle: Create Waffle Chart Visualizations_. R package version 1.0.2,
+  <https://CRAN.R-project.org/package=waffle>.
+
+Wilke C (2022). _ggridges: Ridgeline Plots in 'ggplot2'_. R package version 0.5.4,
+  <https://CRAN.R-project.org/package=ggridges>.
+
+Wickham H, Seidel D (2022). _scales: Scale Functions for Visualization_. R package version 1.2.1,
+  <https://CRAN.R-project.org/package=scales>.
+
+Wilkins D (2023). _treemapify: Draw Treemaps in 'ggplot2'_. R package version 2.5.6,
+  <https://CRAN.R-project.org/package=treemapify>.
