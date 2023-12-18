@@ -8,5 +8,5 @@ In this folder you can find the following documents:
 - **Logistic regression:** data analysis using logistic regression. This analysis was done as a final project for the class "Applied Logistic Regression".
 - **Fixed effects regression (soon):**
 - **Survival analysis (soon):**
-- **Instrumental variable:** replication of a published paper using instrumental variable. This analysis was done as a final project of the Statistics II class for my master's degree.
+- **Instrumental variable:** replication of a published paper using a regression with an instrumental variable. This analysis was done as a final project of the Statistics II class for my master's degree.
 - **Merge datasets using non-exact match (soon):**
