@@ -9,4 +9,5 @@ In this folder you can find the following documents:
 - **Fixed effects regression:** data analysis using Fixed Effects regressions to analyse the PAIRFAM panel data. The analysis explores the relation between relationship status and life satisfaction. This analysis was done as a final project for the class "Applied Longitudinal Data".
 - **Instrumental variable:** replication of a published paper using regression with instrumental variable. This analysis was done as a final project of the Statistics II class for my master's degree.
 - **Survival analysis (soon)**
+- **Difference-in-difference (soon)**
 - **Merging datasets using non-exact match (soon)**
