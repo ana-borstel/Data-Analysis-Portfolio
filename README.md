@@ -9,4 +9,4 @@ In this folder you can find the following documents:
 - **Fixed effects regression (soon):**
 - **Survival analysis (soon):**
 - **Instrumental variable:** replication of a published paper using regression with instrumental variable. This analysis was done as a final project of the Statistics II class for my master's degree.
-- **Merge datasets using non-exact match (soon):**
+- **Merging datasets using non-exact match (soon):**
