@@ -1,0 +1,220 @@
+---
+title: "Fixed Effect Regression"
+author: "Ana Elisa von Borstel (ana-borstel)"
+date: "2023-12-16"
+output:
+  html_document:
+    code_folding: hide
+    df_print: paged
+    highlight: tango
+    theme: cosmo
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+
+library(plm)
+library(dplyr)
+library(tidyverse)
+library(haven)
+library(stargazer)
+library(ggplot2)
+library(coefplot)
+library(readxl)
+
+data <- read_dta("AlinaAnnaElisa.dta")
+
+```
+
+```{r}
+#clean data
+data <- dplyr::filter (data, sat6 >= 0)#97643
+#data <- dplyr::filter (data, marstat >= 1 & marstat < 4)#96838
+data <- dplyr::filter (data, relstat >= 1)#96634
+data <- dplyr::filter (data, lfs >= 1)#96634
+data <- dplyr::filter (data, age >=18)#85161
+data <- dplyr::filter (data, sex_gen >=1)#85146
+data <- dplyr::filter (data, nkids >=0)#85144
+data <- dplyr::filter (data, isced >=0)#85064
+
+#reorganize data
+data <- data %>% #re-organize categories
+  mutate(working = case_when(lfs <= 7 ~ "0",
+                             lfs <= 13 ~ "1")) %>% 
+  mutate(gender = case_when(sex_gen == 1 ~ "Male", 
+                            sex_gen == 2 ~ "Female"))%>% 
+  mutate(rel_status = case_when(relstat == 1 ~ "1-SINGLE",
+                                relstat == 2 ~ "2-LAT",
+                                relstat == 3 ~ "3-COHAB",
+                                relstat == 4 ~ "3-COHAB",
+                                relstat == 5 ~ "2-LAT",
+                                relstat == 6 ~ "1-SINGLE",
+                                relstat == 7 ~ "2-LAT",
+                                relstat == 8 ~ "3-COHAB",
+                                relstat == 9 ~ "1-SINGLE",
+                                relstat == 10 ~ "2-LAT",
+                                relstat == 11 ~ "3-COHAB"))%>% 
+  mutate(education = case_when(isced == 0 ~ "1-Studying",
+                               isced <= 3 ~ "2-Lower secondary",
+                               isced <= 6 ~ "3-Upper secondary",
+                               isced <= 8 ~ "4-Tertiary"))
+
+data$wave <-as.factor(data$wave)
+
+```
+
+This analysis was done for the Final Data Analysis Project for the class “Applied Longitudinal Data” under the Master of Public Policy at Hertie School. 
+
+Abstract: This paper uses panel data from PAIRFAM to compare life satisfaction in Germany among people with different relationship status. A Fixed Effect model is used to measure changes in life satisfaction among single people, people in a relationship living together and people in a relationship living apart, controlling for employment, education, and number of kids. In a second part of the study, gender heterogeneity is analyzed. The results show that living together with a partner increases overall life satisfaction. Notwithstanding, the size of the effect is slightly higher for men than for women. 
+
+## Introduction
+
+The objective of this paper is to explore the relation between relationship status and life satisfaction in Germany. Previous studies show how marriage increases life satisfaction; however, there is a gap in studies analyzing partnership status beyond civil status. From the Second Demographic Transition (SDT), new living arrangements became more common, such as living together with a partner without being married or partners living apart. Therefore, this analysis focuses on how relationship status (on a broader spectrum beyond marriage) and living arrangements affect life satisfaction.
+
+It is expected that living together with a partner brings not only companionship and emotional support, but also security and financial gains. Compared with living alone, couples living together share household chores, expenditures, and can support each other in times of difficulties. However, a decline in marriage rate and an increasing divorce rate since 1964 in Europe (Eurostat, 2022) might be an indication that the effect of marriage on life satisfaction is not as strong as initially thought to be. 
+
+The research questions this paper seeks to address are: living together with a partner increases life satisfaction in comparison to being single? Is the effect stronger for men than women? The motivation of this research is to contribute to the debate of the effect of different living arrangements and relationship status on life satisfaction regardless of civil status. 
+
+## Theory, Prior Studies and Hypothesis
+
+There is a consensus from previous studies that marriage or cohabitation increases life satisfaction. Notwithstanding, authors find slightly different results depending on when the research was conducted and how the models were designed.  
+
+Stutzer & Frey (2006) address the question of self-selection in studies on life satisfaction and marriage. The authors explore if happier individuals are more likely to marry or if marriage does increase happiness. The period of analysis is 1984-2000 and the sample do not include divorced respondents. The results show that being married and living together increases life satisfaction in comparison to being single, being single with a partner or being married but living apart. Women in the sample are slightly more satisfied with marriage than men. The authors, however, find evidence for selection: singles who will get married are on average happier than singles who will not get married, controlling for socio-demographic characteristics.
+
+Zimmermann & Easterlin (2006) explore the effects of cohabitation, marriage, and divorce on life satisfaction. The data comes from the German SOEP and covers a period from 1984 to 2004. The authors not only account for selection effect, but also build a baseline of life satisfaction for the pre-marriage period and account for the “honeymoon” period just after the marriage. The results show that the formation of cohabiting unions before marriage significantly increases life satisfaction in comparison to the baseline. Life satisfaction increases even further at the year of marriage and the year after. After the honeymoon period, life satisfaction decreases, but it still higher than the baseline period. Finally, the authors find that the formation of successful unions (cohabitation or marriage) has a positive impact on life satisfaction, but no significant difference of the two types of union.
+
+Naess et all (2015) studies marital transitions and life satisfaction in Norway. The data used is an unbalanced panel from 1984 to 2008 that covers the entire population of a county of Norway. The authors analyze life satisfaction among never-married, cohabiting, married, divorced, and widowed. The results show that marriage and cohabitation increase life satisfaction in comparison to the other groups. However, part of the effect is due to self-selection: people more satisfied with life are more likely to get into a partnership and remain in one. The authors also analyze gender heterogeneity and find that although men and women have similar increase in life satisfaction with marriage or cohabitation, divorced is much more harmful to young men than to other age or gender groups. Also, widowhood is more harmful for men than for women.  The authors conclude that this could be an evidence that marriage is more advantageous for men than for women.
+
+
+## Data and Analytical Sample
+
+The data for this analysis comes from the Panel Analysis of Intimate Relationships and Family Dynamics (PAIRFAM), release 13.0 (Brüderl et al. 2022). A detailed description of the study can be found in Huinink et al. (2011). The original dataset includes 97,643 observations. For the analysis, data from all 13 waves are used. 
+
+I restrict the dataset to respondents aged 18 years old or more when they joined the survey. Moreover, respondents with missing information on the variables of analysis (life satisfaction, relationship status, gender, education and number of kids) were deleted. The final analytical sample contains 85,347 observations, a 13% reduction from the original sample.
+
+The dependent variable, general life satisfaction, is measured on a scale 0 to 10, in which 0 is very unsatisfied and 10 is very satisfied. The main independent variable, relationship status, is recoded to aggregate respondents in three main groups: (1) single, (2) in a relationship & living together (cohabitation), and (3) in a relationship & living apart (LAT). The three categories include people with different civil status (single, married, divorced, widowed), since the focus of this research is to study relationship and living arrangements on life satisfaction.
+
+Control variables were also reorganized for the sake of simplification. Working status was built as a dummy variable, in which “working” was coded as 1 and “not working” as 0. The Education variable was built based on the ISCED classification. The categories “no degree” and “lower secondary education” were grouped together for simplification.
+
+```{r}
+table1::label (data$rel_status) <- "Relationship status"
+table1::label (data$education) <- "Education"
+table1::label (data$gender) <- "Gender"
+table1::label (data$working) <- "Working status"
+table1::table1(~ gender + rel_status + working +  nkids + education | rel_status, data=data)
+```
+
+Table above shows the sample statistics of the independent variable. There are more female respondents (53%) than males (47%), and more people in a relationship living together (56%) than singles (28%) and people living apart together (LAT) (16%). The mean number of children is higher for in a relationship living together than the other two groups. The majority (47%) of the sample has upper secondary education. Data is overall well distributed among the three groups of analysis. 
+
+The method used for the analysis is the Fixed Effects model, which analyzes respondents within variation controlling for time trends and non-varying respondents’ characteristics. A linear regression model (cross-sectional) is used to compare how the results change when non-time varying effects are controlled for. Finally, the sample is divided into two groups (one for female respondents and the other for male) and the fixed effect regression is used for each group.
+
+MODEL 1: Linear regression
+MODEL 2: Fixed effects
+MODEL 3 & 4: Gender heterogeneity
+
+The main hypothesis is that living together with a partner increases life satisfaction in comparison to being single or living apart from the partner. The secondary hypothesis is that the effect of cohabitation on life satisfaction increases in a higher for men than for women.
+
+## Descriptive Results
+
+Figure 1 shows the distribution of the dependent variable among relationship status of analysis (single, LAT, and cohabitation). The median value of life satisfaction among respondents in the LAT and cohabitation status are similar. The median value of the dependent variable for respondents in the single status is lower than the other two status. 
+
+```{r}
+data %>% 
+  ggplot(aes(x = rel_status, y = sat6)) +
+  geom_boxplot()+
+  labs(x = "", 
+       y = "", 
+       title  = "Figure 1: distribution of respondents’ life satisfaction grouped by relationship status.")+
+  theme_classic()
+```
+
+Figure 2 shows the distribution of life satisfaction of people in the three groups of analysis divided by gender. It seems to be no gender heterogeneity within groups. The median of life satisfaction among the single status is lower than the other two relationship status for female and male respondents.
+
+```{r}
+data %>% 
+  ggplot(aes(x = rel_status, y = sat6, color = gender)) +
+  geom_boxplot()+
+ labs(x = "", 
+       y = "", 
+       title  = "Figure 2: distribution of respondents’ life satisfaction grouped by relationship status and gender.")+
+  theme_classic()
+```
+
+## Regression Results
+
+Model 1 is a liner regression that accounts for time trends but not for individuals time not varying characteristics. The results show that being a living apart together (LAT) relationship increases life satisfaction in 0.51 points in comparison to being single. Being in a cohabitation relationship status increases life satisfaction in 0.90 points in comparison to being single, controlling for gender, education, number of kids and working status. All results are statistically significant; however, the liner regression does not account for time invariant individual characteristics of respondents, therefore the coefficients are inflated. 
+
+```{r}
+linear_model <- lm(sat6 ~ rel_status + gender + education + as.factor(working) + nkids + age + wave , data= data)
+
+stargazer(linear_model,type="text",summary = T,  covariate.labels = c("LAT status","Cohabitation status", "Gender: Male", "Edu-Lower Secondary", "Edu-Upper Secondary", "Edu-Tertiary", "Working: Yes" ,"Number of kids", "Age"),
+           title = "Table 1: Regression results of Linear Model", 
+          align=TRUE, dep.var.labels = "Life satisfaction")
+```
+
+
+The second model is a fixed effect regression that controls for time trends and non-varying individual characteristics. The coefficients for LAT and Cohabitation are smaller than the ones in the linear regression model. In the second model, being in a LAT and Cohabitation relationships increases life satisfaction in 0.42 and 0.59 points respectively, in comparison to being single. Working status, number of kids and educational status are controlled. The results are statistically significant. 
+
+Comparing the first and second models shows that the linear model coefficients for relationship status were inflated. The coefficient for cohabitation status decreased by 0.3 points from the linear to the fixed effects model. Notwithstanding, the model shows that being in a LAT or cohabitation relationship increases life satisfaction in comparison to being single.
+
+The second part of this analysis compares the fixed effects regression (Model 2) for female and male respondents. The coefficients for LAT and Cohabitation status are higher for men than for women, indicating that life satisfaction increases more for men in LAT and cohabitation relationships than for women in the same relationship status, in comparison to being single. However, the differences between men and women seem quite small. Life satisfaction for men increases by 0.46 points when being in a LAT relationship and by 0.62 when being in a Cohabitation relationship in comparison to being single. For women, life satisfaction increases by 0.39 when in a Lat and by 0.56. These represents a difference in 0.07 and 0.06 points respectively. The results are statistically significant at a 1% level. 
+
+
+```{r}
+
+
+model01 <- plm(sat6 ~ rel_status + education + as.factor(working) + nkids  + wave +age, data=data, index=c("id","wave"), model = "within")
+
+data_female <- filter(data, sex_gen == 2)
+
+data_male <- filter(data, sex_gen == 1)
+
+model_female <- plm(sat6 ~  rel_status + education + as.factor(working) + nkids  + wave, data=data_female, index=c("id","wave"), model = "within")
+
+model_male <- plm(sat6 ~ rel_status + education + as.factor(working) + nkids  + wave, data=data_male, index=c("id","wave"), model = "within")
+
+stargazer(model01, model_female, model_male, type="text",summary = T,
+          covariate.labels = c("LAT status","Cohabitation status", "Edu-Lower Secondary", "Edu-Upper Secondary", 
+                               "Edu-Tertiary", "Working: Yes" ,"Number of kids", "Wave 2", "Wave 3", 
+                               "Wave 4", "Wave 5","Wave 6", "Wave 7", "Wave 8", "Wave 9", "Wave 10", "Wave 11", 
+                               "Wavw 12", "Wave 13", "Constant" ,"Age"),
+           title = "Table 2: Regression results of Fixed Effects models", 
+          column.labels = c("Model FE", "Model FE Female", "Model FE Male"), 
+          align=TRUE, dep.var.labels = "Life satisfaction")
+```
+
+## Conclusion
+
+The results show that being in a relationship and living together with their partner increases life satisfaction in general, confirming the hypothesis. The increase is a bit higher for men than for women, which is probably explained by traditional gender roles expected in a relationship. In traditional gender roles, housework and childcare fall more heavily on women than men. Even when women are employed and earn more than their partners, they are still expected to do more house chores. This creates an overburden of double journey on women, which can decrease their life satisfaction in comparison to men. 
+
+Limitations on research include the subjectiveness of life satisfaction and omitted variable bias. A possible omitted variable biasing the results could be beauty, since it is a time varying characteristic, and it is likely associated to life satisfaction and relationship status. Beautiful people are more likely to be more satisfied with life and to be in a relationship. Although this variable is included in the survey used for this analysis, it was not included in the model. The variable is built based on the interviewer’s opinion. If the person who is interviewing the responds is not the same across years, it is likely that there is error measurement (variation in this variable that is not related to the objectivity beauty of respondents, but rather to the subjective taste of interviewers). Other variables that might be interesting to control are the duration of the relationship, and sexual orientation. 
+
+Further research could explore how more gender dynamics in a relationship affect gender heterogeneity in life satisfaction. For example, if couples with similar education levels or couples with more equal share of housework have higher life satisfaction than couples with different education levels or unequal housework share. There are some questions in the survey regarding the division of labor in partnership that would be worth exploring.
+
+## References
+
+Brüderl, Josef, Sonja Drobnič, Karsten Hank, Franz J. Neyer, Sabine Walper, Philipp Alt, Elisabeth Borschel, Christiane Bozoyan, Madison Garrett, Svenja Geissler, Tita Gonzalez Avilés, Nicolai Gröpler, Kristin Hajek, Michel Herzig, Rüdiger Lenke, Renate Lorenz, Katharina Lutz, Timo Peter, Richard Preetz, Julia Reim, Barbara Sawatzki, Claudia Schmiedeberg, Philipp Schütze, Nina Schumann, Carolin Thönnissen, Katharina Timmermann & Martin Wetzel. 2022. The German Family Panel (pairfam). GESIS Data Archive, Cologne. ZA5678 Data file Version 13.0.0, doi.org/10.4232/pairfam.5678.13.0.0
+
+Eurostat (2022). How many marriages and divorces tool place in 2020? European Commission, Statistical office of the European Union. Available at: https://ec.europa.eu/eurostat/web/products-eurostat-news/-/ddn-20220516-2
+
+Huinink, Johannes, Josef Brüderl, Bernhard Nauck, Sabine Walper, Laura Castiglioni, & Michael Feldhaus. 2011. Panel Analysis of Intimate Relationships and Family Dynamics (pairfam): Conceptual framework and design. Zeitschrift für Familienforschung - Journal of Family Research 23 (1): 77-101. https://nbn-resolving.org/urn:nbn:de:0168-ssoar-376463
+
+Naess, S.; Blekesaune, M.; Jakobsson, N. (2015). Marital transitions and life satisfaction: Evidence from longitudinal data from Norway. SAGE, Acta Sociologica, 58:1, 63-78.
+
+Stutzer, A. & Frey, B.S. (2006). Does marriage make people happy, or do happy people get married? The Journal of Socio-Economics, 35: 326-347.
+
+Zimmermann, A. & Easterlin, R. (2006). Happily Ever after? Cohabitation, Marriage, Divorce, and Happiness in Germany. Population and Development Review, 32:3, 511-528.
+
+## R packages
+
+Croissant Y, Millo G (2008). “Panel Data Econometrics in R: The plm Package.” _Journal of Statistical Software_, *27*(2), 1-43. doi:10.18637/jss.v027.i02 <https://doi.org/10.18637/jss.v027.i02>.
+
+Hlavac, Marek (2022). stargazer: Well-Formatted Regression and Summary Statistics Tables. R package version 5.2.3. https://CRAN.R-project.org/package=stargazer
+
+Wickham H, Averick M, Bryan J, Chang W, McGowan LD, François R, Grolemund G, Hayes A, Henry L, Hester J, Kuhn M, Pedersen TL, Miller E, Bache SM, Müller K, Ooms J, Robinson D, Seidel DP, Spinu V, Takahashi K, Vaughan D, Wilke C, WooK, Yutani H (2019). “Welcome to the tidyverse.” _Journal of Open Source Software_, *4*(43), 1686. doi:10.21105/joss.01686 <https://doi.org/10.21105/joss.01686>.
+
+Wickham H, Miller E, Smith D (2022). _haven: Import and Export 'SPSS', 'Stata' and 'SAS' Files_. R package version 2.5.1, <https://CRAN.R-project.org/package=haven>.
+
+Wickham H. ggplot2: Elegant Graphics for Data Analysis. Springer-Verlag New York, 2016.
+
