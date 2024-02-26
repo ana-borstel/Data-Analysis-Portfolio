@@ -1103,7 +1103,7 @@ writeData(wb, 6, dt_cor_chronic_access_health)
 writeData(wb, 7, dt_cor_disability_access_health)
 
 # save the workbook to a file
-saveWorkbook(wb, "C:/Users/VONBORST/OneDrive - UNHCR/04- Health and Mental Health/03- Tabulated Data/Health_analysis_tabulations.xlsx")
+saveWorkbook(wb, "Health_analysis_tabulations.xlsx")
 
 
 
