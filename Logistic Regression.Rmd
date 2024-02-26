@@ -32,9 +32,9 @@ library(questionr)
 library(scales)
 library(sjPlot) 
 
-data_2012 <- read_dta("~/Documents/Data Analysis Portfolio/Logistic regression/ESS6e02_4.dta")
-data_2016 <- read_dta("~/Documents/Data Analysis Portfolio/Logistic regression/ESS8e02_2.dta")
-data_2018 <- read_dta("~/Documents/Data Analysis Portfolio/Logistic regression/ESS9e03_1.dta")
+data_2012 <- read_dta("ESS6e02_4.dta")
+data_2016 <- read_dta("ESS8e02_2.dta")
+data_2018 <- read_dta("ESS9e03_1.dta")
 
 ```
 
