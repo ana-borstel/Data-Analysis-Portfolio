@@ -27,7 +27,7 @@ library(treemapify)
 library(scales)
 library(openxlsx)
 
-data_ESS10 <- read_csv("C:/Users/VONBORST/OneDrive - UNHCR/Power BI/ESS10.csv")
+data_ESS10 <- read_csv("/ESS10.csv")
 
 ```
 
