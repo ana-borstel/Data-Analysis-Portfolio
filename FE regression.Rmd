@@ -23,7 +23,7 @@ library(ggplot2)
 library(coefplot)
 library(readxl)
 
-data <- read_dta("AlinaAnnaElisa.dta")
+data <- read_dta("data.dta")
 
 ```
 
