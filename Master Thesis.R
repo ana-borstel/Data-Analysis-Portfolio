@@ -27,40 +27,40 @@ library(coefplot)
 #-------------------- Data -----------------------------------------------------
 
 #Frontex dataset filtered by Central and Western Mediterranean routes
-detection_data <- read_excel("~/Documents/Hertie School/7. Thesis/Data/detection_data.xlsx")
+detection_data <- read_excel("detection_data.xlsx")
 
 #Conflict data 
-conflict_death <- read_excel("~/Library/CloudStorage/OneDrive-HertieSchool/Thesis/Data/GEDEvent_v22_1-2.xlsx")
+conflict_death <- read_excel("GEDEvent_v22_1-2.xlsx")
 
 #ISO list
-ISO <- read_excel("~/Documents/Hertie School/7. Thesis/Data/ISO_complete.xlsx")
+ISO <- read_excel("ISO_complete.xlsx")
 
 #GDP per capita
-GDP_per_capita <- read_excel("~/Documents/Hertie School/7. Thesis/Data/GDP_per_capita.xls")
+GDP_per_capita <- read_excel("GDP_per_capita.xls")
 
 #Unemployment
-unemployment <- read_excel("~/Documents/Hertie School/7. Thesis/Data/unemployment.xls")
+unemployment <- read_excel("unemployment.xls")
 
 #Population size
-population <- read_excel("~/Documents/Hertie School/7. Thesis/Data/population.xls")
+population <- read_excel("population.xls")
 
 #Political variables
-political <- read_csv("~/Library/CloudStorage/OneDrive-HertieSchool/Thesis/Data/qog_std_ts_jan23.csv")
+political <- read_csv("qog_std_ts_jan23.csv")
 
 #2014 arrival gender
-data_2014 <- read_excel("~/Documents/Hertie School/7. Thesis/Data/data_2014.xlsx")
+data_2014 <- read_excel("data_2014.xlsx")
 
 #2015 arrival gender
-data_2015 <- read_excel("~/Documents/Hertie School/7. Thesis/Data/data_2015.xlsx")
+data_2015 <- read_excel("data_2015.xlsx")
 
 #2016 arrival gender 
-data_2016 <- read_excel("~/Documents/Hertie School/7. Thesis/Data/data_2016.xlsx")
+data_2016 <- read_excel("data_2016.xlsx")
 
 #2017 arrival gender
-data_2017 <- data_2017 <- read_excel("~/Documents/Hertie School/7. Thesis/Data/data_2017.xlsx")
+data_2017 <- data_2017 <- read_excel("data_2017.xlsx")
 
 #2018 arrival gender
-data_2018 <- read_excel("~/Library/CloudStorage/OneDrive-HertieSchool/Thesis/Data/data_2018.xlsx")
+data_2018 <- read_excel("data_2018.xlsx")
 
 # -------------------- Data transformation -------------------------------------
 
